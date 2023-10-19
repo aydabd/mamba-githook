@@ -1,0 +1,25 @@
+# Debian build files
+*.deb
+*.udeb
+*.build
+*.changes
+*.dsc
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+
+# Temporary files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# IDE and editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Other common ignores
+.DS_Store
+Thumbs.db
