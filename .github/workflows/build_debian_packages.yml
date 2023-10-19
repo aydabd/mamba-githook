@@ -1,0 +1,73 @@
+# name: Build Debian Packages
+
+# on:
+#   push:
+#     tags: [ "[0-9]+.[0-9]+" ]
+#   workflow_dispatch:  # Allow manually triggering the workflow
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     strategy:
+#       fail-fast: true
+#       matrix:
+#         arch: [amd64, armhf, arm64]
+
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Set up QEMU
+#         uses: docker/setup-qemu-action@v3
+
+#       - name: Build Debian package
+#         run: |
+#           docker run --rm --privileged -v "$GITHUB_WORKSPACE":/workspace -e QEMU_ARCH="${{ matrix.arch }}" build-deb-action:latest
+
+#       - name: Upload Debian package
+#         uses: actions/upload-artifact@v3
+#         with:
+#           name: debian-packages-${{ matrix.arch }}.deb
+#           path: artifacts/*.deb
+name: Build Debian Packages
+
+on:
+  push:
+    tags: [ "[0-9]+.[0-9]+" ]
+  workflow_dispatch:  # Allow manually triggering the workflow
+
+env:
+  BUILDX_CACHE_DIR: /tmp/.buildx-cache
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: [amd64, armhf, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Cache Docker layers
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.BUILDX_CACHE_DIR }}
+          key: ${{ runner.os }}-buildx-${{ matrix.arch }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-${{ matrix.arch }}-
+            ${{ runner.os }}-buildx-
+
+      - name: Build Debian package
+        run: |
+          docker run --rm --privileged -v "$GITHUB_WORKSPACE":/workspace -e QEMU_ARCH="${{ matrix.arch }}" build-deb-action:latest
+
+      - name: Upload Debian package
+        uses: actions/upload-artifact@v3
+        with:
+          name: debian-packages-${{ matrix.arch }}.deb
+          path: artifacts/*.deb

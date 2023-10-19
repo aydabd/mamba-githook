@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# install mamba-githook debian package
+sudo dpkg -i mamba-githook_0.0.1-1_amd64.deb
+
+# check if mamba-githook is installed
+mamba-githook --version
+
+# create a git repository
+mkdir test_repo
+cd test_repo
+git init
+
+# configure mamaba-githook for the git repository
+mamba-githook -p
+
+# Create a file in the git repository
+touch test_file
+
+# Add the file to the git repository
+git add test_file
+
+# Commit the file to the git repository
+git commit -m "Add test_file"

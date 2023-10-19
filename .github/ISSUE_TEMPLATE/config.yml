@@ -1,0 +1,8 @@
+blank_issues_enabled: false  # Disables the option for blank issues
+issue_templates:
+  - name: Feature request
+    description: Suggest an idea for this project
+    template: feature_request.yml
+  - name: Bug report
+    description: Problem using mamba-githook
+    template: bug_report.yml

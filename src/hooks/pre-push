@@ -1,0 +1,53 @@
+#!/bin/sh
+################################################################################
+# Title: This hook checks if the commit message contains a JIRA issue reference.
+# Description: If the commit message does not contain a JIRA issue reference,
+# the commit is aborted. This hook is configured by 'mamba-githook'.
+# Author: Aydin Abdi
+#
+# Usage:
+#   Add issue reference in the footer of the commit message:
+# >>>Commit message example<<<
+#  Fix deadlock in the scheduler.
+#
+#  JIRA: MYPROJECT-567
+################################################################################
+
+set -e
+. /usr/share/mamba-githook/utils/variables.sh
+
+# Define colors
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+ORANGE='\033[0;33m'
+NC='\033[0m'
+JIRA_PRJECT_NAME="JIRA-PROJECT-NAME"
+JIRA_PROJECT_LINK="ADD-HERE-JIRA_PROJECT-LINK"
+
+# Define pattern for JIRA issue and commit message path
+pattern="JIRA:[[:space:]]*${JIRA_PRJECT_NAME}-[[:digit:]]+"
+commit_editmsg_path=".git/COMMIT_EDITMSG"
+remote_string="refs/for/main"
+
+# Read git push arguments
+read local_ref local_sha remote_ref remote_sha
+
+# Check if we are pushing to the main branch
+case "${remote_ref}" in
+$remote_string*)
+    # Check if the commit message contains the JIRA issue
+    if ! grep -iqE "${pattern}" "${commit_editmsg_path}"; then
+        log_warning "${RED}[WARNING]: Incorrect or missing Jira reference.${NC}"
+        log_warning "Add issue reference in the footer:"
+        log_warning "JIRA: <JIRA-PROJECT-KEY>-<ISSUE-NUMBER>"
+        log_warning "If no Jira exists, one can be created on the project."
+        log_warning "${BLUE}$JIRA_PROJECT_LINK${NC}"
+        exit 1
+    else
+        log_info "Correct Jira reference in commit message."
+    fi
+    ;;
+*)
+    log_info "${ORANGE}Not pushing for '${remote_string}', does not need to check Jira reference${NC}"
+    ;;
+esac

@@ -1,0 +1,43 @@
+.TH MAMBA-GITHOOK 1 "2023"
+.SH NAME
+mamba-githook \- a program that activate git hooks based on micromamba environments.
+.SH SYNOPSIS
+.B mamba-githook
+[-options] [arguments]
+.SH DESCRIPTION
+mamba-githook is a program that activate the git hooks for the current repository
+or globally. It will create sample hooks in the .githooks.d/ directory of the
+current repository. The path of core.hookPath will be set to /usr/share/mamba-githook/hooks.
+Hokks that are inside the .githooks.d/ directory will be executed after the hooks
+that are inside the /usr/share/mamba-githook/hooks directory.
+
+.SH OPTIONS
+.TP
+.B \-h
+Prints the help message.
+.TP
+.B \-v
+Prints the version number.
+.TP
+.B \-g
+Activates the git hooks globally for new repositories.
+.TP
+.B \-d
+Deactivates the git hooks globally.
+.TP
+.B \-p
+Activates the git hooks for the current repository.
+.TP
+.B \-r
+Deactivates the git hooks for the current repository.
+
+.SH AUTHOR
+Written by
+.BR Aydin Abdi. <
+.BR
+
+.SH COPYRIGHT
+Copyright (c) 2023 Aydin Abdi.
+.SH LICENSE
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

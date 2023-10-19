@@ -1,0 +1,79 @@
+#!/bin/sh
+######################################################################
+# Title: pre-commit hook for micromamba environment
+# Description: Runs the pre-commit hook in the micromamba environment.
+# This pre-commit hooks configured based on 'mamba-githook' package.
+# Author: Aydin Abdi
+######################################################################
+
+set -e
+. /usr/share/mamba-githook/utils/variables.sh
+. /usr/share/mamba-githook/utils/logger.sh
+
+__run_githooks_in_githooks_dir() {
+    #################################################
+    # Runs the githooks in the .githooks.d directory.
+    #
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    #################################################
+    if [ -d "${LOCAL_GIT_HOOKS_DIR}" ]; then
+        for hook in "${LOCAL_GIT_HOOKS_DIR}/"*; do
+            [ -x "${hook}" ] || continue # skip non-executable files
+            "${hook}" || return 1
+        done
+    fi
+    return 0
+}
+
+__initialize_micromamba_in_shell() {
+    ################################################
+    # Initializes the micromamba shell hook.
+    #
+    # Args:
+    #   $1: Name of the micromamba environment
+    #
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    env_name="$1"
+    eval "$("${MICROMAMBA_EXE}" shell hook -s posix -p "${DEFAULT_MICROMAMBA_ENV_PATH}/${env_name}")" || {
+        log_error "Failed to initialize micromamba in the shell"
+        return 1
+    }
+    return 0
+}
+
+test_command() {
+    ##################################################
+    # Tests if a command is successful or not.
+    #
+    # Args:
+    #   $@: Command to run
+    #
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    #
+    # Example:
+    #   test_command micromamba activate micromamba-env
+    ###################################################
+    "$@"
+    status="$?"
+    if [ "${status}" -ne 0 ]; then
+        log_error "found error with" "$@"
+        exit 1
+    fi
+    return ${status}
+}
+
+main() {
+    #####################################
+    # Main function to run all functions.
+    #####################################
+    test_command "${MAMBA_GITHOOK_DIR}/manage_micromamba_env"
+    test_command __initialize_micromamba_in_shell "${DEFAULT_MICROMAMBA_ENV_NAME}"
+    test_command "${MICROMAMBA_EXE}" activate "${DEFAULT_MICROMAMBA_ENV_NAME}"
+    test_command __run_githooks_in_githooks_dir
+}
+
+main

@@ -1,0 +1,7 @@
+name: mamba-githook
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python
+  - pre-commit

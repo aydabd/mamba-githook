@@ -1,0 +1,89 @@
+#!/bin/sh
+###################################################################
+# Title: postinst
+# Description: This script is executed after the installation of
+#              mamba-githook package. This script is used to backup
+#              the git configuration.
+# Author: Aydin Abdi
+###################################################################
+set -e
+. /usr/share/mamba-githook/utils/logger.sh
+. /usr/share/mamba-githook/utils/variables.sh
+
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+MAMBA_GITHOOK_BACKUP_DIR="/usr/share/mamba-githook/backup"
+BACKUP_GIT_CORE_HOOKSPATH="${MAMBA_GITHOOK_BACKUP_DIR}/core.hookPath.config"
+BACKUP_GIT_INIT_TEMPLATEDIR="${MAMBA_GITHOOK_BACKUP_DIR}/init.templatedir.config"
+
+__create_backup_dir() {
+    ################################################
+    # Creates the backup directory.
+    #
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    if [ -d "${MAMBA_GITHOOK_BACKUP_DIR}" ]; then
+        sudo -u "${ORIG_USER}" mkdir -p "${MAMBA_GITHOOK_BACKUP_DIR}" || {
+            log_error "Failed to create the backup directory" "'${MAMBA_GITHOOK_BACKUP_DIR}'"
+            return 1
+        }
+    fi
+    log_info "Successfully created the backup directory" "'${MAMBA_GITHOOK_BACKUP_DIR}'"
+    return 0
+}
+
+__backup_git_global_hookspath() {
+    ################################################
+    # Backs up the git hookspath configuration.
+    #
+    # Note: This is not necessary for the hooks to
+    #       be removed from existing repositories.
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    if sudo -u "${ORIG_USER}" git config --global --get "${CORE_HOOKSPATH_OPTION}" >/dev/null 2>&1; then
+        sudo -u "${ORIG_USER}" git config --global --get "${CORE_HOOKSPATH_OPTION}" >"${BACKUP_GIT_CORE_HOOKSPATH}" || {
+            log_error "Failed to backup ${CORE_HOOKSPATH_OPTION}"
+            return 1
+        }
+    fi
+    log_info "Successfully backed up git" "$CORE_HOOKSPATH_OPTION" "into" "$BACKUP_GIT_CORE_HOOKSPATH"
+    return 0
+}
+
+__backup_git_global_init_templatedir() {
+    ################################################
+    # Backs up the git init.templatedir configuration.
+    #
+    # Note: This is not necessary for the hooks to
+    #       be removed from existing repositories.
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    if sudo -u $ORIG_USER git config --global --get "${INIT_TEMPLATEDIR_OPTION}" >/dev/null 2>&1; then
+        sudo -u $ORIG_USER git config --global --get "${INIT_TEMPLATEDIR_OPTION}" >"$BACKUP_GIT_INIT_TEMPLATEDIR" || {
+            log_error "Failed to backup ${INIT_TEMPLATEDIR_OPTION}"
+            return 1
+        }
+    fi
+    log_info "Successfully backed up git" "${INIT_TEMPLATEDIR_OPTION}" "into" "$BACKUP_GIT_INIT_TEMPLATEDIR"
+    return 0
+}
+
+main() {
+    ################
+    # Main function.
+    ################
+    if ! __create_backup_dir; then
+        log_error "Failed to create the backup directory"
+        exit 1
+    fi
+    if ! __backup_git_global_hookspath; then
+        log_error "Failed to backup git config:" "$CORE_HOOKSPATH_OPTION"
+        exit 1
+    fi
+    log_info "Successfully backed up git config:" "$CORE_HOOKSPATH_OPTION"
+}
+
+main
+#DEBHELPER#

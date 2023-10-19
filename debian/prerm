@@ -1,0 +1,76 @@
+#!/bin/sh
+###############################################################################
+# Title: Remove global Git configuration core.hooksPath.
+# Description: This script removes the global Git configuration core.hooksPath.
+#              This even removes all micromamba files and installations.
+# Author: Aydin Abdi
+###############################################################################
+set -e
+
+ORIG_USER="${SUDO_USER:-$USER}"
+CORE_HOOKSPATH_OPTION="core.hooksPath"
+INIT_TEMPLATEDIR_OPTION="init.templatedir"
+CONFIGURE_MICROMAMBA_SCRIPT="/usr/share/mamba-githook/scripts/configure_micromamba"
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+FAILED=0
+
+__unset_git_hookspath() {
+    ################################################
+    # Unsets the git hookspath configuration.
+    #
+    # Note: This is not necessary for the hooks to
+    #       be removed from existing repositories.
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    if sudo -u "${ORIG_USER}" git config --global --get "${CORE_HOOKSPATH_OPTION}" >/dev/null 2>&1; then
+        sudo -u "${ORIG_USER}" git config --global --unset "${CORE_HOOKSPATH_OPTION}" || {
+            printf "${TIMESTAMP}-[ERROR]: Failed to unset ${CORE_HOOKSPATH_OPTION}" >&2
+            return 1
+        }
+    fi
+    printf "${TIMESTAMP}-[INFO]: Successfully unset git hookspath configuration"
+    return 0
+}
+
+__unset_git_init_templatedir() {
+    ################################################
+    # Unsets the git init.templatedir configuration.
+    #
+    # Note: This is not necessary for the hooks to
+    #       be removed from existing repositories.
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    if sudo -u "${ORIG_USER}" git config --global --get "${INIT_TEMPLATEDIR_OPTION}" >/dev/null 2>&1; then
+        sudo -u "${ORIG_USER}" git config --global --unset "${INIT_TEMPLATEDIR_OPTION}" || {
+            printf "${TIMESTAMP}-[ERROR]: Failed to unset ${INIT_TEMPLATEDIR_OPTION}" >&2
+            return 1
+        }
+    fi
+    printf "${TIMESTAMP}-[INFO]: Successfully unset git init.templatedir configuration"
+    return 0
+}
+
+main() {
+    ################
+    # Main function.
+    ################
+    if ! __unset_git_hookspath; then
+        FAILED=1
+    fi
+
+    if [ $FAILED -eq 1 ]; then
+        printf "${TIMESTAMP}-[ERROR]: Failed to remove global Git hook configurations" >&2
+        exit 1
+    fi
+
+    if $CONFIGURE_MICROMAMBA_SCRIPT "-u"; then
+        printf "${TIMESTAMP}-[INFO]: Successfully uninstalled 'mamba-githook'"
+    else
+        exit 1
+    fi
+}
+
+main
+#DEBHELPER#

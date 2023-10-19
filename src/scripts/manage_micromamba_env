@@ -1,0 +1,146 @@
+#!/bin/sh
+################################################################
+# Title: manage_micromamba_env
+# Description: This script manages micromamba environments.
+# Author: Aydin Abdi
+#
+# Usage:
+#   manage_micromamba_env [-h] [-n env_name] [-f yaml_file_path]
+# Options:
+#   -h : Display help information
+#   -n : Name of the micromamba environment
+#   -f : Path to the environment yaml file
+################################################################
+
+set -e
+. /usr/share/mamba-githook/utils/logger.sh
+. /usr/share/mamba-githook/utils/variables.sh
+
+usage() {
+  printf "Usage: %s [-h] [-n env_name] [-f yaml_file_path]\n" "${0}"
+  printf "Options:\n"
+  printf "  -h : Display help information\n"
+  printf "  -n : Name of the micromamba environment\n"
+  printf "  -f : Path to the environment yaml file\n"
+}
+
+__check_yaml_file_exists() {
+  ################################################
+  # Checks if the specified yaml file exists.
+  #
+  # Args:
+  #   $1: Path to the yaml file
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  yaml_file="$1"
+  if [[ ! -f "${yaml_file}" ]]; then
+    log_error "Could not find yaml file" "'${yaml_file}'"
+    return 1
+  fi
+}
+
+__create_micromamba_env_based_on_yaml() {
+  #########################################################################
+  # Creates a micromamba environment with the specified name and yaml file.
+  #
+  # Args:
+  #   $1: Name of the micromamba environment
+  #   $2: Path to the yaml file
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  #########################################################################
+  env_name="$1"
+  yaml_file="$2"
+  "${MICROMAMA_CREATE_ENV_CMD}" "${DEFAULT_MICROMAMBA_OPTIONS}" -c "${DEFAULT_MICROMAMBA_CHANNEL}" -n "${env_name}" --file "${yaml_file}"
+}
+
+__check_micromamba_env_exists() {
+  ######################################################
+  # Checks if a specified micromamba environment exists.
+  #
+  # Args:
+  #   $1: Name of the micromamba environment
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ######################################################
+  env_name="$1"
+
+  # Get the list of micromamba environments
+  micromamba_envs="$(${MICROMAMBA_ENV_LIST_CMD})"
+
+  # Check if the specified micromamba environment exists in the output
+  if printf "%s" "${micromamba_envs}" | grep -q "\"${DEFAULT_MICROMAMBA_PREFIX}/envs/${env_name}\""; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+__parse_args() {
+  ################################################
+  # Parses the command line arguments.
+  #
+  # Args:
+  #   $@: Command line arguments
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  while getopts ":hn:p:" opt; do
+    case $opt in
+    h)
+      usage
+      exit 0
+      ;;
+    n)
+      GIT_HOOK_MICROMAMBA_ENV="${OPTARG:-$DEFAULT_GIT_HOOK_MICROMAMBA_ENV}"
+      ;;
+    f)
+      YAML_FILE_PATH="${OPTARG:-$DEFAULT_ENV_YAML_FILE}"
+      ;;
+    \?)
+      log_error "Invalid option: -" "'${OPTARG}'"
+      usage
+      exit 1
+      ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+}
+
+main() {
+  ################################################################################
+  # Checks if micromamba is installed and if the specified environment exists.
+  # If micromamba is not installed, it prints a warning and exits.
+  # If the environment does not exist, it creates it from the specified yaml file.
+  ################################################################################
+  __parse_args "$@"
+
+  # Check if micromamba env exists
+  micromamba_exists="$(__check_micromamba_env_exists "${GIT_HOOK_MICROMAMBA_ENV}")"
+  if [[ "${micromamba_exists}" -eq 0 ]]; then
+    log_info "Micromamba environment" "'${GIT_HOOK_MICROMAMBA_ENV}'" "exists"
+    return 0
+  fi
+
+  # Check if yaml file exists
+  yaml_exists="$(__check_yaml_file_exists "${YAML_FILE_PATH}")"
+  if [[ "${yaml_exists}" -eq 0 ]]; then
+    log_error "Could not find yaml file" "'${YAML_FILE_PATH}'"
+    return 1
+  fi
+
+  log_info "Creating micromamba environment" "'${GIT_HOOK_MICROMAMBA_ENV}'" "from yaml file" "'${YAML_FILE_PATH}'"
+  created_mamba="$(__create_micromamba_env_based_on_yaml "${GIT_HOOK_MICROMAMBA_ENV}" "${YAML_FILE_PATH}")"
+  if [[ "${created_mamba}" -eq 0 ]]; then
+    log_error "Could not create micromamba environment" "'${GIT_HOOK_MICROMAMBA_ENV}'"
+    return 1
+  fi
+  log_info "Successfully created micromamba environment" "'${GIT_HOOK_MICROMAMBA_ENV}'"
+}
+
+main "${@:-"-n ${DEFAULT_MICROMAMBA_ENV_NAME} -f ${DEFAULT_ENV_YAML_FILE}"}"

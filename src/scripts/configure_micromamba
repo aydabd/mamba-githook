@@ -1,0 +1,446 @@
+#!/bin/sh
+######################################################################################################
+# Title: configure_micromamba
+# Description: This script installs micromamba and configures it.
+# Author: Aydin Abdi
+#
+# Usage:
+#   configure_micromamba [-h] [-u] [-p prefix_location] [-i yes/no] [-c yes/no]
+# Options:
+#   -h : Display help information
+#   -u : Uninstall micromamba and remove all files
+#   -p prefix_location : Location of the micromamba installation (default: /home/$USER/micromamba)
+#   -i yes/no : Initialize micromamba in the shell (default: no)
+#   -c yes/no : Configure micromamba to use conda-forge and nodefaults (default: yes)
+######################################################################################################
+
+set -e
+. /usr/share/mamba-githook/utils/logger.sh
+. /usr/share/mamba-githook/utils/variables.sh
+
+__is_micromamba_installed() {
+  ####################################################
+  # Checks if micromamba is installed in the system or
+  # the micromamba binary exists in the bin folder.
+  #
+  # Returns:
+  #   0 if micromamba is installed, otherwise 1.
+  ####################################################
+  if ! command -v sudo -u "${ORIG_USER}" "${MICROMAMBA_CMD}" >/dev/null 2>&1 && ! [ -f "${MICROMAMBA_EXE}" ]; then
+    log_info "micromamba is not installed"
+    return 1
+  fi
+  log_info "micromamba is already installed"
+  return 0
+}
+
+__detect_shell() {
+  #################################################################################
+  # Detects the shell from which the script was called and sets the shell variable.
+  #################################################################################
+  shell_script_name="$0"
+
+  # Get the basename of the shell script name. This will be the name of the shell
+  # from which the script was called.
+  detected_shell="${shell_script_name##*/}"
+
+  # Check if the detected shell is a supported shell.
+  # micromamba supports these shells: (bash, fish, xonsh, zsh)
+  case "${detected_shell}" in
+  "bash" | "fish" | "xonsh" | "zsh")
+    log_info "Detected shell:" "'${detected_shell}'"
+    export DETECTED_SHELL="${detected_shell}"
+    ;;
+  *)
+    log_error "The detected shell '${detected_shell}' is not supported."
+    exit 1
+    ;;
+  esac
+}
+
+__get_shell_rc_file() {
+  ################################################
+  # Gets the shell rc file based on the shell.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  case "${DETECTED_SHELL}" in
+  bash)
+    export SHELL_RC_FILE="${BASHRC}"
+    ;;
+  zsh)
+    export SHELL_RC_FILE="${ZSHRC}"
+    ;;
+  fish)
+    export SHELL_RC_FILE="${FISH_CONFIG}"
+    ;;
+  xonsh)
+    export SHELL_RC_FILE="${XONSHRC}"
+    ;;
+  *)
+    log_error "Unsupported shell:" "'${DETECTED_SHELL}'"
+    return 1
+    ;;
+  esac
+  logger_info "Shell rc file:" "'${SHELL_RC_FILE}'"
+  return 0
+}
+
+__computing_artifact_location() {
+  ##################################################################
+  # Computes the artifact location based on the OS and architecture.
+  # Sets the DEFAULT_RELEASE_URL variable.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ##################################################################
+  case "$(uname)" in
+  Linux)
+    PLATFORM="linux"
+    ;;
+  Darwin)
+    PLATFORM="osx"
+    ;;
+  *NT*)
+    PLATFORM="win"
+    ;;
+  esac
+
+  ARCH="$(uname -m)"
+  case "${ARCH}" in
+  aarch64 | ppc64le | arm64) ;; # pass
+  *)
+    ARCH="64"
+    ;;
+  esac
+
+  case "${PLATFORM}-${ARCH}" in
+  linux-aarch64 | linux-ppc64le | linux-64 | osx-arm64 | osx-64 | win-64) ;; # pass
+  *)
+    log_error "Failed to detect your Operative System."
+    return 1
+    ;;
+  esac
+
+  if [ "${VERSION:-}" = "" ]; then
+    DEFAULT_RELEASE_URL="https://github.com/mamba-org/micromamba-releases/releases/latest/download/micromamba-${PLATFORM}-${ARCH}"
+  else
+    DEFAULT_RELEASE_URL="https://github.com/mamba-org/micromamba-releases/releases/download/micromamba-${VERSION}/micromamba-${PLATFORM}-${ARCH}"
+  fi
+  return 0
+}
+
+__download_artifact() {
+  ################################################
+  # Downloads the micromamba artifact.
+  #
+  # Args:
+  #   $1: URL of the micromamba artifact
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  RELEASE_URL=$1
+  mkdir -p "${BIN_FOLDER}"
+  if command -v sudo -u "${ORIG_USER}" curl >/dev/null 2>&1; then
+    sudo -u "${ORIG_USER}" curl -o "${BIN_FOLDER}"/micromamba -fsSL --compressed "${RELEASE_URL}" || {
+      log_error "Failed to download micromamba from" "'${RELEASE_URL}'"
+      return 1
+    }
+  elif command -v sudo -u "${ORIG_USER}" wget >/dev/null 2>&1; then
+    sudo -u "${ORIG_USER}" wget -qO "${BIN_FOLDER}/micromamba" "'${RELEASE_URL}'" || {
+      log_error "Failed to download micromamba from" "'${RELEASE_URL}'"
+      return 1
+    }
+  else
+    log_error "Neither curl nor wget was found"
+    return 1
+  fi
+  sudo -u "${ORIG_USER}" chmod +x "${BIN_FOLDER}/micromamba" || {
+    log_error "Failed to set executable permission on" "'${BIN_FOLDER}/micromamba'"
+    return 1
+  }
+  log_info "Downloaded micromamba to" "'${BIN_FOLDER}/micromamba'"
+  return 0
+}
+
+__initialize_shell() {
+  ########################################################
+  # Initializes micromamba in the shell.
+  #
+  # Args:
+  #   $1: y|Y|yes to initialize the shell, otherwise skip.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ########################################################
+  INITIATE_SHELL=$1
+  micromamba_version=$(sudo -u "${ORIG_USER}" "${BIN_FOLDER}/micromamba" --version)
+  log_info "micromamba version:" "'${micromamba_version}'"
+
+  case "${INITIATE_SHELL}" in
+  y | Y | yes)
+    case "${micromamba_version}" in
+    1.* | 0.*)
+      shell_arg=-s
+      prefix_arg=-p
+      ;;
+    *)
+      shell_arg=--shell
+      prefix_arg=--root-prefix
+      ;;
+    esac
+    if ! sudo -u "${ORIG_USER}" "${BIN_FOLDER}/micromamba" -q shell init "${shell_arg}" "${DETECTED_SHELL}" "${prefix_arg}" "${PREFIX_LOCATION}"; then
+      return 1
+    fi
+
+    log_info "Please restart your shell to activate micromamba or run the following:"
+    log_info "  source ~/.bashrc (or ~/.zshrc, ~/.xonshrc, ~/.config/fish/config.fish, ...)"
+    ;;
+  *)
+    log_info "You can initialize your shell later by running:"
+    log_info "  micromamba shell init -s" "'${DETECTED_SHELL}'" "-p" "'${PREFIX_LOCATION}'"
+    ;;
+  esac
+  return 0
+}
+
+__configure_conda_forge_channels() {
+  #######################################################################
+  # Configures micromamba to use conda-forge and nodefaults.
+  #
+  # Args:
+  #   $1: y|Y|yes to configure micromamba, otherwise skip. (default: yes)
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  #######################################################################
+  CONDA_FORGE_YES=$1
+  case "${CONDA_FORGE_YES}" in
+  y | Y | yes)
+    sudo -u "${ORIG_USER}" "${BIN_FOLDER}"/micromamba config append channels conda-forge || {
+      log_error "Failed to configure micromamba conda-forge channel" \
+        return 1
+    }
+    sudo -u "${ORIG_USER}" "${BIN_FOLDER}/micromamba" config append channels nodefaults || {
+      log_error "Failed to configure micromamba nodefaults channel" \
+        return 1
+    }
+    sudo -u "${ORIG_USER}" "${BIN_FOLDER}/micromamba" config set channel_priority strict || {
+      log_error "Failed to configure micromamba channel_priority" \
+        return 1
+    }
+    log_info "Configured micromamba to use 'conda-forge' and 'nodefaults'"
+    ;;
+  *)
+    log_info "Skipping configuring channels for micromamba"
+    ;;
+  esac
+}
+
+__backup_file() {
+  ###############################################
+  # Backs up the user's file into a backup file.
+  #
+  # Args:
+  #   $1: File to back up
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  file="${1}"
+  backup_timestamp="$(date +%Y%m%d%H%M%S)"
+  backup_file="${file}.micromamba-backup.${backup_timestamp}"
+  sudo -u "${ORIG_USER}" cp "${file}" "${backup_file}" || {
+    log_error "Failed to back up" "'${file}'" "into" "'${backup_file}'"
+    return 1
+  }
+  log_info "Backed up" "'${file}'" "into" "'${backup_file}'"
+  return 0
+}
+
+__restore_mamba_modified_rc_file() {
+  ###############################################
+  # Restores the micromamba modified rc file to
+  # its original state.
+  #
+  # Args:
+  #   $1: File to restore
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  rc_file="${1}"
+  sudo -u "${ORIG_USER}" sed -i '/# >>> mamba initialize >>>/,/# <<< mamba initialize <<</d' "${rc_file}" || {
+    log_error "Failed to remove micromamba modifications on" "'${rc_file}'"
+    return 1
+  }
+  # Remove trailing newlines at the end of the file
+  sudo -u "${ORIG_USER}" sed -i -e :a -e '/^\n*$/{$d;N;};/\n$/ba' "${rc_file}" || {
+    log_error "Failed to remove trailing newlines at the end of" "'${rc_file}'"
+    return 1
+  }
+  log_info "Removed micromamba modifications on" "'${rc_file}'"
+  return 0
+}
+
+__remove_conda_files() {
+  ###########################
+  # Removes micromamba files.
+  ###########################
+  failed=0
+  if [ -d "${DEFAULT_MICROMAMBA_PREFIX}" ]; then
+    sudo -u "${ORIG_USER}" rm -rf "${DEFAULT_MICROMAMBA_PREFIX}" || {
+      log_warning "Failed to remove" "'${DEFAULT_MICROMAMBA_PREFIX}'"
+      failed=1
+    }
+  fi
+  if [ -d "${HOME}/.mamba" ]; then
+    sudo -u "${ORIG_USER}" rm -rf "${HOME}/.mamba" || {
+      log_warning "Failed to remove" "'${HOME}/.mamba'"
+      failed=1
+    }
+  fi
+  if [ -f "${HOME}/.condarc" ]; then
+    sudo -u "${ORIG_USER}" rm -rf "${HOME}/.condarc" || {
+      log_warning "Failed to remove" "'${HOME}/.condarc'"
+      failed=1
+    }
+  fi
+  if [ -f "${HOME}/.conda" ]; then
+    sudo -u "${ORIG_USER}" rm -rf "${HOME}/.conda" || {
+      log_warning "Failed to remove" "'${HOME}/.conda'"
+      failed=1
+    }
+  fi
+  if [ -f "${BIN_FOLDER}/micromamba" ]; then
+    sudo -u "${ORIG_USER}" rm -rf "${BIN_FOLDER}/micromamba" || {
+      log_warning "Failed to remove" "'${BIN_FOLDER}/micromamba'"
+      failed=1
+    }
+  fi
+  if [ "${failed}" -eq 1 ]; then
+    return 1
+  fi
+  return 0
+}
+
+__uninstall_micromamba() {
+  ##############################################
+  # Uninstalls micromamba and removes all files.
+  ##############################################
+  __get_shell_rc_file || {
+    return 1
+  }
+  __backup_file "${SHELL_RC_FILE}" || {
+    return 1
+  }
+  __restore_mamba_modified_rc_file "${SHELL_RC_FILE}" || {
+    return 1
+  }
+  __remove_conda_files || {
+    return 1
+  }
+  # Unset the micromamba command
+  export MICROMAMBA_CMD=""
+  return 0
+}
+
+usage() {
+  ###########################
+  # Prints usage information.
+  ###########################
+  printf "Usage: %s [-h] [-u] [-p prefix_location] [-i yes/no] [-c yes/no]\n" "$0"
+  printf "Options:\n"
+  printf "  -h : Display help information\n"
+  printf "  -u : Uninstall micromamba and remove all files\n"
+  printf "  -p prefix_location : Location of the micromamba installation (default: %s)\n" "${DEFAULT_MICROMAMBA_PREFIX}"
+  printf "  -i yes/no : Initialize micromamba in the shell (default: %s)\n" "${DEFAULT_INIT_YES}"
+  printf "  -c yes/no : Configure micromamba to use conda-forge and nodefaults (default: %s)\n" "${CONDA_FORGE_YES}"
+}
+
+__parse_args() {
+  ###################################################
+  # Parses command line arguments and sets variables.
+  #
+  # Args:
+  #   $@: Command line arguments
+  ###################################################
+
+  while getopts ":hup:i:c:" opt; do
+    case $opt in
+    h)
+      usage
+      exit 0
+      ;;
+    u)
+      UNINSTALL=true
+      ;;
+    p)
+      PREFIX_LOCATION="${OPTARG:-$DEFAULT_MICROMAMBA_PREFIX}"
+      ;;
+    i)
+      INITIATE_SHELL="${OPTARG:-$DEFAULT_INITIATE}"
+      ;;
+    c)
+      CONDA_FORGE_YES="${OPTARG:-$DEFAULT_CONDA_FORGE_YES}"
+      ;;
+    \?)
+      log_error "Invalid option: -" "'${OPTARG}'"
+      usage &
+      >2
+      exit 1
+      ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+}
+
+main() {
+  #####################################
+  # Main function to run all functions.
+  #
+  # Args:
+  #   $@: Command line arguments
+  #####################################
+  UNINSTALL=false
+  __parse_args "$@"
+
+  if [ "${UNINSTALL}" = true ]; then
+    log_info "Uninstalling micromamba..."
+    __uninstall_micromamba || {
+      log_warning "Failed to uninstall micromamba"
+      exit 1
+    }
+    log_info "Micromamba is uninstalled successfully"
+    exit 0
+  fi
+
+  if ! __is_micromamba_installed; then
+    __detect_shell || {
+      exit 1
+    }
+    __computing_artifact_location || {
+      log_error "Failed to compute the artifact location"
+      exit 1
+    }
+    __download_artifact "${DEFAULT_RELEASE_URL}" || {
+      log_error "Failed to download micromamba from" "'${DEFAULT_RELEASE_URL}'"
+      exit 1
+    }
+    __initialize_shell "${INITIATE_SHELL}" || {
+      log_error "Failed to initialize micromamba in" "'${DETECTED_SHELL}'"
+      exit 1
+    }
+    __configure_conda_forge_channels "${CONDA_FORGE_YES}" || {
+      log_error "Failed to configure micromamba channels"
+      exit 1
+    }
+    log_info "Micromamba is installed successfully"
+  fi
+  exit 0
+}
+
+# default args: "-c yes" "-i yes"
+main "${@:-"-c yes" "-i yes"}"
