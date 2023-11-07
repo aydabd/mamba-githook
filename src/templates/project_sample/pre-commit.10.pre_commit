@@ -1,0 +1,16 @@
+#!/bin/sh
+###################################################################
+# Title: pre-commit hook
+# Description: This is a sample pre-commit hook. Edit this file to
+# add your own pre-commit commands.
+#
+# Author: Aydin Abdi
+###################################################################
+set -e
+
+# Set the project githooks directory, otherwise use the default value
+: "${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR:=".githooks.d"}"
+
+# Run pre-commit hooks for all files
+printf "Running pre-commit hooks for all files"
+pre-commit run --all-files -c "${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR}/.pre-commit-config.yaml"

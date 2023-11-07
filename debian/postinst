@@ -1,0 +1,76 @@
+#!/bin/sh
+###################################################################
+# Title: postinst
+# Description: This script is executed after the installation of
+#              mamba-githook package. This script is used to backup
+#              the git global core.hooksPath configuration if any
+#              exists. This is necessary for the hooks to be removed
+#              from existing repositories.
+#              See 'mamba-githook --help' for more information.
+# Author: Aydin Abdi
+###################################################################
+set -e
+
+MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-"/usr/share/mamba-githook"}"
+
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/variables.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/logger.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/git_common.sh"
+
+BACKUP_GIT_CORE_HOOKSPATH="${MAMBA_GITHOOK_BACKUP_DIR}/core.hookpath.config"
+
+__create_mamba_githook_backup_dir() {
+    ################################################
+    # Creates the backup directory.
+    #
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    resp=$(sudo -u "${USER}" mkdir -p "${MAMBA_GITHOOK_BACKUP_DIR}" 2>&1) || {
+        log_error "Failed to create the backup directory:" "${MAMBA_GITHOOK_BACKUP_DIR}" "STDERR: ${resp}"
+        return 1
+    }
+    log_info "Successfully created the backup directory:" "${MAMBA_GITHOOK_BACKUP_DIR}"
+    return 0
+}
+
+__backup_git_global_hookspath() {
+    ################################################
+    # Backs up the git hookspath configuration.
+    #
+    # Note: This is not necessary for the hooks to
+    #       be removed from existing repositories.
+    # Returns:
+    #   0 if the command is successful, 1 otherwise.
+    ################################################
+    mamba_githook_hooks_path="${1}"
+    resp=$(cat "${mamba_githook_hooks_path}" >"${GIT_CONFIG_CORE_HOOKSPATH_BACKUP}" 2>&1) || {
+        log_error "Failed to backup git hookspath configuration:" "${mamba_githook_path}" "STDERR: ${resp}"
+        return 1
+    }
+    log_info "Successfully backed up git hookspath configuration:" "${mamba_githook_path}" "into" "${GIT_CONFIG_CORE_HOOKSPATH_BACKUP}"
+    return 0
+}
+
+main() {
+    ################
+    # Main function.
+    ################
+    resp=$(git_cm_config_get_core_hookspath global 2>/dev/null) || {
+        log_info "No global git hookspath configuration found"
+        return 0
+    }
+
+    if [ ! -d "${MAMBA_GITHOOK_BACKUP_DIR}" ]; then
+        __create_mamba_githook_backup_dir || {
+            return 1
+        }
+    fi
+
+    __backup_git_global_hookspath "${resp}" || {
+        return 1
+    }
+}
+
+main
+#DEBHELPER#

@@ -1,0 +1,49 @@
+#!/bin/sh
+###############################################################################
+# Title: Remove global Git 'core.hooksPath' configuration.
+# Description: This script removes the global Git configuration core.hooksPath.
+#              This is necessary for the hooks to be removed from
+#              existing repositories.
+#              All micromamba environments, sample project that are
+#              created by 'mamba-githook' can be removed before uninstalling
+#              the package. This will make sure that micromamba that can be
+#              used without mamba-githook package is not removed.
+#              See 'mamba-githook --help' for more information.
+#
+# Author: Aydin Abdi
+###############################################################################
+set -e
+
+MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-"/usr/share/mamba-githook"}"
+
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/variables.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/logger.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/git_common.sh"
+
+main() {
+  ################
+  # Main function.
+  ################
+  mamba_githook_path=$(git_cm_config_get_core_hookspath global 2>/dev/null) || {
+    log_info "No global git hookspath configuration found"
+    return 0
+  }
+
+  if [ -f "${GIT_CONFIG_CORE_HOOKSPATH_BACKUP}" ]; then
+    backed_up_mamba_githook_path_content=$(cat "${GIT_CONFIG_CORE_HOOKSPATH_BACKUP}")
+    log_info "Set back the global git hookspath configuration to" "${backed_up_mamba_githook_path_content}"
+    git_cm_config_set_core_hookspath global "${backed_up_mamba_githook_path_content}" || {
+      return 1
+    }
+    return 0
+  else
+    log_info "Unset the global git hookspath configuration"
+    git_cm_config_unset_core_hookspath global || {
+      return 1
+    }
+    return 0
+  fi
+}
+
+main
+#DEBHELPER#

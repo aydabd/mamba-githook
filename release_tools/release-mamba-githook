@@ -1,0 +1,51 @@
+#!/bin/sh
+
+. release_tools/changelog.sh
+. src/utils/__version.sh
+
+export DEBEMAIL="ayd.abd@gmail.com"
+export DEBFULLNAME="Aydin Abdi"
+
+usage() {
+  cat <<EOF
+Usage:
+  ${0##*/} [options]
+
+Options:
+  -h, --help            Show this help message and exit
+  --update-changelog    Update the changelog
+  --commit-changelog    Commit the changelog
+EOF
+}
+
+main() {
+  options="$1"
+  version="$(get_version)"
+  case "${options}" in
+  -h | --help)
+    usage
+    ;;
+  --create-changelog)
+    create_changelog
+    return 0
+    ;;
+  --create-tag)
+    create_tag "${version}"
+    return 0
+    ;;
+  --update-changelog)
+    handle_changelog "${version}"
+    return 0
+    ;;
+  --commit-changelog)
+    commit_changelog
+    return 0
+    ;;
+  *)
+    usage
+    return 1
+    ;;
+  esac
+}
+
+main "$@"
