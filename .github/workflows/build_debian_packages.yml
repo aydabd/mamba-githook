@@ -1,0 +1,44 @@
+name: Build Debian Packages
+
+on:
+  push:
+    tags: [ "[0-9]+.[0-9]+.[0-9]+" ]
+
+env:
+  DEBEMAIL: "${{ github.actor }}@users.noreply.github.com"
+  DEBFULLNAME: "${{ github.actor }}"
+
+jobs:
+  build-debian-packages:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ amd64, arm64, armhf ]
+    container:
+      image: debian:latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Setup Debian Package for build Environment
+      run: |
+        apt-get update -y && apt-get install -y \
+        --no-install-recommends \
+        build-essential \
+        debhelper devscripts lintian \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+    - name: Build Debian Package
+      run: debuild --no-lintian -us -uc -b --post-clean -a${{matrix.platform}}
+
+    - name: Copy debian package to workspace
+      run: |
+        mkdir -p debian-package
+        cp ../mamba-githook_*.deb mamba-githook_${{matrix.platform}}.deb
+
+    - name: Upload debian package
+      uses: actions/upload-artifact@v3
+      with:
+        name:  mamba-githook_${{matrix.platform}}.deb
+        path: mamba-githook_${{matrix.platform}}.deb

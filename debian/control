@@ -1,0 +1,15 @@
+Source: mamba-githook
+Section: devel
+Priority: optional
+Maintainer: Aydin Abdi <ayd.abd@gmail.com>
+Build-Depends: debhelper (>=12)
+Standards-Version: 4.5.1
+Homepage: http://www.debian.org
+
+Package: mamba-githook
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends}, curl, wget, git
+Description: Run githoooks inside micromamba environment
+ This package contains the mamba-githook application.
+ This application is used to run githooks inside the micromamba environment.

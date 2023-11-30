@@ -1,0 +1,130 @@
+name: Lint and Build Debian Package For Lintian
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'  # Runs at 00:00 UTC every Sunday
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  MICROMAMBA_VERSION: '1.5.1-0'
+  ENVIRONMENT_FILE: 'tests/mamba-env/environment.yml'
+  GIT_REF_BRANCH: ${{ github.head_ref}}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  DEBEMAIL: "${{ github.actor }}@users.noreply.github.com"
+  DEBFULLNAME: "${{ github.actor }}"
+  DEBIAN_CACHE_PATH: /tmp/debian_cache
+  DEBIAN_CONTROL_CACHE: debian/control
+  # cache key base on github cache rules between branch and pull request
+  MICROMAMBA_CACHE_KEY: micromamba-env-key-${{ github.head_ref }}-${{ github.event_name }}
+
+jobs:
+  # Prepare jobs are used to prepare micromamba environment and debian caches
+  prepare_debian_packages_cache:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    container:
+      image: debian:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create debian cache directory
+        run: mkdir -p ${{ env.DEBIAN_CACHE_PATH }}
+
+      - name: Cache for debian packages
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.DEBIAN_CACHE_PATH }}
+          key: |
+            ${{ runner.os }}-debian-${{ hashFiles(env.DEBIAN_CONTROL_CACHE) }}-${{ env.GIT_REF_BRANCH }}
+          restore-keys: |
+            ${{ runner.os }}-apt-${{ hashFiles(env.DEBIAN_CONTROL_CACHE) }}-${{ env.GIT_REF_BRANCH }}
+
+  prepare_micromamba_environment_cache:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup micromamba and cache environment
+      uses: mamba-org/setup-micromamba@v1
+      with:
+        micromamba-version: ${{ env.MICROMAMBA_VERSION }}
+        environment-file: ${{ env.ENVIRONMENT_FILE }}
+        # only cache environment
+        cache-environment: true
+        cache-downloads: false
+        # hasfile for env file and some other options appends to the cache key
+        cache-environment-key: ${{ env.MICROMAMBA_CACHE_KEY }}
+
+  lintian-deb-package:
+    needs: prepare_debian_packages_cache
+    runs-on: ubuntu-latest
+    container:
+      image: debian:latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Setup Debian Package Build Environment
+      run: |
+        apt-get update -y && apt-get install -y \
+        --no-install-recommends \
+        build-essential \
+        debhelper devscripts lintian \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+    - name: Build Debian Package
+      run: dpkg-buildpackage --unsigned-source --unsigned-changes
+
+    - name: Run lintian
+      run: |
+        lintian -v --fail-on warning
+
+    - name: Copy debian package to workspace
+      run: |
+        mkdir -p debian-package
+        cp ../mamba-githook_*.deb debian-package
+
+    - name: Upload debian package
+      uses: actions/upload-artifact@v3
+      with:
+        name: debian-package
+        path: debian-package
+
+    - name: Display debian package
+      run: ls -lah debian-package
+
+  run-linters:
+    needs: prepare_micromamba_environment_cache
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x ${{ github.workspace }}/auto-fix-pre-commit
+
+      - name: Setup micromamba from cached environment
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          micromamba-version: ${{ env.MICROMAMBA_VERSION }}
+          environment-file: ${{ env.ENVIRONMENT_FILE }}
+          # cached from prepare job which runs on schedule or if no cache is found
+          cache-environment-key: ${{ env.MICROMAMBA_CACHE_KEY }}
+
+      - name: Run auto_commit_pre_commit_fix.sh on micromamba cached environment
+        run: micromamba run -n mamba-githook ${{ github.workspace }}/auto-fix-pre-commit

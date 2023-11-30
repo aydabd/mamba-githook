@@ -7,12 +7,21 @@
 *.tar.gz
 *.tar.xz
 *.tar.bz2
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.substvars
+debian/mamba-githook/
 
 # Temporary files
 *.swp
 *.swo
 *.bak
 *.tmp
+*.log
+**/.githooks.d/**
+# bats-core unit test results
+TestReport*.xml
 
 # IDE and editor files
 .idea/
@@ -23,3 +32,27 @@
 # Other common ignores
 .DS_Store
 Thumbs.db
+
+# python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+**/site-packages/**
+**/dist/**
+**/build/**
+**/venv/**
+**/env/**
+**/lib64/**
+**/lib/**
+**/bin/**
+**/include/**
+**/share/**
+**/local/**
+**/etc/**
+**/var/**
+**/tmp/**
+**/log/**
+**/cache/**
+**/data/**

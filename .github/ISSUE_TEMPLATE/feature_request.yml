@@ -1,0 +1,30 @@
+name: Feature Request
+description: Suggest a new feature or improvement for mamba-githook
+body:
+  - type: markdown
+    attributes:
+      value: "## Feature Request"
+  - type: input
+    id: feature_title
+    attributes:
+      label: Feature Title
+      placeholder: Briefly describe the feature you're proposing.
+      value: "Feature: "
+    validations:
+      required: true
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: Feature Description
+      placeholder: Elaborate on the details of the feature.
+      value: "## Description\n\n## Use-Case\n\n## Additional Context"
+    validations:
+      required: true
+  - type: checkboxes
+    id: similar_feature
+    attributes:
+      label: Existing Features
+      description: Have you checked if a similar feature has been requested or implemented?
+      options:
+        - label: "I have searched and found no similar feature requests."
+          required: true

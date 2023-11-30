@@ -1,0 +1,76 @@
+name: Bug Report
+description: File a bug report
+body:
+  - type: markdown
+    attributes:
+      value: "## Bug Report Checklist"
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: "Preliminaries"
+      description: "Before submitting, please check the [Troubleshooting Docs](https://github.com/aydabd/mamba-githook/blob/main/docs/troubleshooting.md)"
+      options:
+        - label: "I have checked the troubleshooting documentation."
+          required: true
+
+  - type: dropdown
+    id: installation_method
+    attributes:
+      label: "Installation Method"
+      description: "How did you install mamba-githook?"
+      options:
+        - "Option 1"
+        - "Option 2"
+    validations:
+      required: true
+
+  - type: input
+    id: issue_search
+    attributes:
+      label: "Issue Search"
+      placeholder: "Have you searched for similar issues?"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: latest_version
+    attributes:
+      label: "Latest Version"
+      description: "Ensure you're using the [latest version](https://github/aydabd/mamba-githook/releases/latest) of mamba-githook."
+      options:
+        - label: "I am using the latest version."
+          required: true
+
+  - type: markdown
+    attributes:
+      value: "## Issue Details"
+
+  - type: textarea
+    id: issue_description
+    attributes:
+      label: "Describe the Issue"
+      placeholder: "Detailed description of the issue."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs"
+      placeholder: "Paste relevant logs here."
+      render: shell
+
+  - type: textarea
+    id: environment_yaml
+    attributes:
+      label: "Environment YAML"
+      placeholder: "Paste your `environment.yml` here."
+      render: yaml
+
+  - type: textarea
+    id: condarc
+    attributes:
+      label: "Condarc Configuration"
+      placeholder: "Paste your `~/.condarc` here."
+      render: yaml
