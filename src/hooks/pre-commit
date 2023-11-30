@@ -1,0 +1,47 @@
+#!/bin/sh
+######################################################################
+# Title: pre-commit hook for micromamba environment
+# Description: Run the pre-commit hook in the micromamba environment.
+# This pre-commit hooks configured based on 'mamba-githook' package.
+#
+# Author: Aydin Abdi
+######################################################################
+set -e
+
+main() {
+  #####################################
+  # Main function to run all functions.
+  #####################################
+  hook_type=$(basename "${0}")
+
+  # Set the project githooks directory
+  $(mamba-githook internal-command __set-project-githooks-dir)
+
+  # A internal function to set the yaml name of the hook type dynamically
+  yaml_file=$(mamba-githook internal-command __export-yaml-file-name "${hook_type}" \
+    $MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR 2>&1)
+
+  # check the environment.yml file exists if not exist skip the hook
+  env_name=$(mamba-githook internal-command __get-env-name "${yaml_file}" 2>&1) || {
+    printf "%s\n" "No environment.yml file found in the project."
+    printf "%s\n" "Skipping the pre-commit hook."
+    return 0
+  }
+
+  # Install micromamba
+  mamba-githook install-micromamba -y
+
+  # Create the micromamba environment
+  mamba-githook micromamba-create-env --file "${yaml_file}"
+
+  # Current shell is not initiated by micromamba
+  # Initiate the current shell will add commands like activate into current shell
+  # See: Official documentation of micromamba
+  eval "$(mamba-githook adhoc-shell)"
+  micromamba activate "${env_name}"
+
+  # Run the pre-commit hook
+  mamba-githook run-hooks "${hook_type}" "${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR}"
+}
+
+main
