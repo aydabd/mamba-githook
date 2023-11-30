@@ -1,0 +1,41 @@
+mamba-githook for Debian
+
+This package contains a git hook that will run mamba on every commit.
+
+## Installation
+
+### Debian
+
+```bash
+sudo apt install mamba-githook
+```
+
+### Other
+
+```bash
+git clone
+cd mamba-githook
+sudo make install
+```
+
+## Uninstall
+
+### Debian
+
+```bash
+sudo apt remove mamba-githook
+```
+
+### Other
+
+```bash
+sudo make uninstall
+```
+
+## License
+
+[MIT](LICENSE)
+
+## Author
+
+[Aydin Abdi]

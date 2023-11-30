@@ -1,0 +1,5 @@
+src/mamba-githook /usr/bin/
+src/hooks/ /usr/share/mamba-githook/
+src/utils/ /usr/share/mamba-githook/
+src/templates/ /usr/share/mamba-githook/
+src/mamba-githook.1 /usr/share/man/man1/

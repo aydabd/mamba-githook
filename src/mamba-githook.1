@@ -1,0 +1,141 @@
+.TH MAMBA-GITHOOK 1 "2023" "Mamba-Githook Manual"
+.SH NAME
+mamba-githook \- Utility to manage Git hooks with micromamba environments.
+
+.SH SYNOPSIS
+.B mamba-githook
+[OPTIONS] [COMMAND] [COMMAND-OPTIONS]
+
+.SH DESCRIPTION
+A utility designed to managing Git hooks within a self-contained Micromamba environment.
+
+This versatile tool enables both project-specific and global configuration of Git hooks,
+ensuring seamless integration and streamlined workflows.
+
+.SH OPTIONS
+.TP
+.B -h, --help
+Print the help message of mamba-githook and exit.
+
+.TP
+.B -v, --version
+Print the version of mamba-githook and exit.
+
+.TP
+.B -V, --verbose
+Enable verbose mode. Enables mamba-githook debug logs.
+
+.TP
+.B -VV, --very-verbose
+Enable very verbose mode. Enables Micromamba and mamba-githook debug logs.
+
+.SH COMMANDS
+.SS "init-project"
+.TP
+.B init-project [OPTIONS]
+Initialize mamba-githook for current git project.
+.IP "-h, --help"
+Prints the help message of mamba-githook init-project command.
+.IP "--create-sample"
+Create a sample project.
+
+.SS "deinit-project"
+.TP
+.B deinit-project [OPTIONS]
+De-initialize mamba-githook for current git project.
+.IP "-h, --help"
+Prints the help message of mamba-githook deinit-project command.
+.IP "--delete-sample"
+Delete the sample project.
+
+.SS "init-global-hookspath"
+.TP
+.B init-global-hookspath
+Initialize mamba-githook globally.
+.IP "-h, --help"
+Prints the help message of mamba-githook init-global-hookspath command.
+
+.SS "deinit-global-hookspath"
+.TP
+.B deinit-global-hookspath
+De-initialize mamba-githook globally.
+.IP "-h, --help"
+Prints the help message of mamba-githook deinit-global-hookspath command.
+
+.SS "install-micromamba"
+.TP
+.B install-micromamba [OPTIONS]
+Install micromamba in the environment.
+.IP "-h, --help"
+Prints the help message of mamba-githook install-micromamba command.
+.IP "-y, --yes"
+Do not ask for confirmation.
+
+.SS "init-shell"
+.TP
+.B init-shell
+Initialize micromamba in the current shell. Needs to restart the shell to take effect.
+.IP "-h, --help"
+Prints the help message of mamba-githook init-shell command.
+
+.SS "adhoc-shell"
+.TP
+.B adhoc-shell
+Initialize micromamba in the current shell.
+.IP "-h, --help"
+Prints the help message of mamba-githook adhoc-shell command.
+
+.SS "uninstall-micromamba"
+.TP
+.B uninstall-micromamba [OPTIONS]
+Uninstall micromamba from the environment.
+.IP "-h, --help"
+Prints the help message of mamba-githook uninstall-micromamba command.
+.IP "-y, --yes"
+Do not ask for confirmation.
+
+.SS "run-micromamba"
+.TP
+.B run-micromamba [OPTIONS] [COMMAND]
+Run an executable in micromamba environment.
+.IP "-h, --help"
+Prints the help message of mamba-githook run-micromamba command.
+.SS EXAMPLES
+.TP
+.B mamba-githook run-micromamba -n <env-name> pre-commit --help
+Prints the help message of pre-commit command installed in the environment.
+
+.SS "create-micromamba-env"
+.TP
+.B create-micromamba-env [OPTIONS] [MICROMAMBA-CREATE-ARGS]
+Create a micromamba environment.
+.IP "-h, --help"
+Prints the help message of mamba-githook create-micromamba-env command.
+.SS EXAMPLES
+.TP
+.B mamba-githook create-micromamba-env --help
+Prints the help message of micromamba create command.
+
+.SS "mcmamba-cmd"
+.TP
+.B mcmamba-cmd [OPTIONS] [MICROMAMBA-COMMAND] [MICROMAMBA-COMMAND-ARGS]
+Run a micromamba command.
+.IP "-h, --help"
+Prints the help message of mcmamba-cmd command.
+.SS EXAMPLES
+.TP
+.B mamba-githook mcmamba-cmd env --help
+Prints the help message of micromamba env command.
+
+.SH "SEE ALSO"
+.BR micromamba (1),
+.BR git (1)
+
+.SH AUTHOR
+Written by Aydin Abdi.
+
+.SH COPYRIGHT
+(c) 2023 Aydin Abdi
+
+.SH LICENSE
+This is free software: you are free to change and redistribute it. There is NO WARRANTY, to the extent permitted by law.

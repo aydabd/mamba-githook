@@ -1,0 +1,896 @@
+#!/bin/sh
+###############################################################################
+# Title: mamba-githook
+# Description: A utility designed to managing Git hooks within a self-contained
+# Micromamba environment.
+# This versatile tool enables both project-specific and global configuration
+# of Git hooks, ensuring seamless integration and streamlined workflows.
+# Private method names starts with '__' prefix.
+#
+# Author: Aydin Abdi
+#
+# See the usage() function for more information.
+###############################################################################
+
+# Use MAMBA_GITHOOK_BASE_PATH to override the base path of mamba-githook
+MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-"/usr/share/mamba-githook"}"
+
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/__version.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/variables.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/logger.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/micromamba_utils.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/git_common.sh"
+. "${MAMBA_GITHOOK_BASE_PATH}/utils/run_hooks.sh"
+
+MAMBA_GITHOOK_PROJECT_SAMPLE_GITHOOKS_DIR=".githooks.d"
+
+__set_project_githooks_dir() {
+  ################################################
+  # Sets the project githooks directory.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  githooks_dir="${1:-"$(git_cm_get_repo_root)/.githooks.d"}"
+  # export the MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR="${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR:-"${githooks_dir}"}"
+  # into shell with 'eval'
+  printf "%s\n" "export MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR=${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR:-$githooks_dir}"
+}
+
+__add_project_sample() {
+  ################################################
+  # Adds the project sample to the .githooks.d
+  #
+  # Args:
+  #   $1: Path to the project sample
+  #   $2: Path to the .githooks.d directory
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  template_dir="$1"
+  custom_hooks_dir="$2"
+  log_debug "Copying ${template_dir} to" "'${custom_hooks_dir}'"
+  # copy templates files to the custom hooks directory,
+  # files can be hidden and non-hidden
+  cp -r "${template_dir}"/. "${custom_hooks_dir}" || {
+    log_error "Failed to copy the template files to" "'${custom_hooks_dir}'"
+    return 1
+  }
+  log_debug "Copied ${template_dir} to" "'${custom_hooks_dir}'"
+  return 0
+}
+
+__make_hooks_executable() {
+  ################################################
+  # Makes all hooks inside the folder executable.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  hooks_dir="$1"
+  log_debug "Making the hooks inside" "'${hooks_dir}'" "executable"
+
+  # Find files inside the hooks directory
+  find "${hooks_dir}" -type f | while IFS= read -r script_file; do
+
+    # Read the first line of the file
+    read -r first_line <"${script_file}"
+
+    # Check if the first line is a shebang then it is a script
+    if echo "${first_line}" | grep -q "^#!"; then
+      # if script_file name following git hook naming convention then make it executable
+      if is_git_hook_type_valid "$(basename "${script_file}")"; then
+        log_debug "Making" "'${script_file}'" "executable"
+        chmod_resp=$(chmod +x "${script_file}" 2>&1) || {
+          log_error "Failed to make" "'${script_file}'" "executable" "STDERR: ${chmod_resp}"
+          return 1
+        }
+        log_info "Made" "'${script_file}'" "executable"
+      fi
+    fi
+  done
+
+  log_debug "Hooks inside" "'${hooks_dir}'" "are executable"
+  return 0
+}
+
+__get_env_name_from_yaml() {
+  ######################################################
+  # Gets the micromamba environment name from the
+  # environment.yml file.
+  #
+  # Args:
+  #   $1: Path to the environment.yml file
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ######################################################
+  env_file="$1"
+  if [ ! -f "${env_file}" ]; then
+    log_debug "Could not find the environment.yml file:" "'${env_file}'"
+    return 1
+  fi
+  # posix regex: ^name:.*$ -> match the line starts with 'name:' and ends with any character
+  # sed regex: s/^name: // -> replace the line starts with 'name:' and ends with any character with empty string
+  env_name=$(grep "^name:.*$" "${env_file}" | sed "s/^name: //")
+  if [ -z "${env_name}" ]; then
+    log_error "Could not find the name of environment from" "'${env_file}'"
+    return 1
+  fi
+  printf "%s\n" "${env_name}"
+  return 0
+}
+
+__uppercase() {
+  ################################################
+  # Converts the given string to uppercase.
+  #
+  # Args:
+  #   $1: String
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  string="$1"
+  printf "%s\n" "${string}" | tr '[:lower:]' '[:upper:]'
+}
+
+__format_hook_type() {
+  ################################################
+  # Formats the hook type.
+  #
+  # Args:
+  #   $1: Hook type
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  hook_type="$1"
+  # Convert the hook type to uppercase
+  hook_type=$(__uppercase "${hook_type}")
+  # Replace '-' with '_' if exists otherwise fail
+  hook_type=$(printf "%s" "${hook_type}" | tr '-' '_' 2>/dev/null) || {
+    log_error "Failed to convert the hook type" "'${hook_type}'" "to uppercase"
+    return 1
+  }
+  printf "%s\n" "${hook_type}"
+  return 0
+}
+
+__set_dynamic_hook_env_yaml_file_name() {
+  ################################################
+  # Sets the environment yaml file name for the
+  # given hook type.
+  #
+  # Args:
+  #   $1: Hook type
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  hook_type="$1"
+
+  _hook_type=$(__format_hook_type "${hook_type}")
+  yaml_name="MAMBA_GITHOOK_${_hook_type}_ENVIRONMENT_YAML_FILE"
+  printf "%s\n" "${yaml_name}"
+  return 0
+}
+
+__export_dynamic_hook_env_yaml_file_name() {
+  ################################################
+  # Exports the environment yaml file name for
+  # the given hook type.
+  #
+  # Args:
+  #   $1: Hook type
+  #   $2: Path to the custom hooks directory inside
+  #       the git repository.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  hook_type="$1"
+  githooks_dir="$2"
+
+  yaml_file="${githooks_dir}/${hook_type}_environment.yml"
+  yaml_name=$(__set_dynamic_hook_env_yaml_file_name "${hook_type}")
+
+  export "${yaml_name}=${yaml_file}" || {
+    log_error "Failed to export the environment yaml file name for" "${hook_type}"
+    return 1
+  }
+
+  eval "printf '%s\n' \"\${${yaml_name}}\""
+  return 0
+}
+
+run_install_micromamba() {
+  ################################################
+  # Installs micromamba.
+  #
+  # Args:
+  #   $1: install options
+  #
+  # Note:
+  # By default, it will install micromamba but
+  # will not initialize shell.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_install_micromamba
+    return 0
+    ;;
+  -y | --yes)
+    mcmamba_utils_install_micromamba
+    return $?
+    ;;
+  *)
+    read -r -p "Are you sure you want to install micromamba? [y/N] " response
+    case "${response}" in
+    [yY][eE][sS] | [yY])
+      mcmamba_utils_install_micromamba
+      return $?
+      ;;
+    *)
+      usage_install_micromamba
+      return 1
+      ;;
+    esac
+    ;;
+  esac
+  return 0
+}
+
+run_uninstall_micromamba() {
+  ################################################
+  # Uninstalls micromamba. It will ask user for
+  # removal confirmation.
+  #
+  # Args:
+  #   $1: uninstall options
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_uninstall_micromamba
+    return 0
+    ;;
+  -y | --yes)
+    mcmamba_utils_uninstall_micromamba
+    return $?
+    ;;
+  *)
+    read -r -p "Are you sure you want to uninstall micromamba? [y/N] " response
+    case "${response}" in
+    [yY][eE][sS] | [yY])
+      mcmamba_utils_uninstall_micromamba
+      return $?
+      ;;
+    *)
+      usage_uninstall_micromamba
+      return 1
+      ;;
+    esac
+    ;;
+  esac
+  return 0
+}
+
+__create_project_sample() {
+  #################################################
+  # Sets up the project sample directory and files.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  #################################################
+  git_cm_is_repo
+  repo_root=$(git_cm_get_repo_root)
+  repo_name=$(git_cm_get_repo_name)
+  absolut_path_git_hooks_dir="${repo_root}/${MAMBA_GITHOOK_PROJECT_SAMPLE_GITHOOKS_DIR}"
+
+  log_debug "Setting up project sample for" "'${repo_name}'"
+
+  if ! sh_cm_is_dir_exist "${absolut_path_git_hooks_dir}"; then
+    sh_cm_mkdir "${absolut_path_git_hooks_dir}"
+    __add_project_sample "${MAMBA_GITHOOK_BASE_PATH}/templates/project_sample" \
+      "${absolut_path_git_hooks_dir}"
+  else
+    log_debug "Not overwriting the existing project sample"
+  fi
+
+  __make_hooks_executable "${absolut_path_git_hooks_dir}"
+  log_debug "Project sample for" "'${repo_name}'" "created successfully"
+  return 0
+}
+
+__delete_project_sample() {
+  #################################################
+  # Removes the project sample directory and files.
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  #################################################
+  git_cm_is_repo
+  repo_root=$(git_cm_get_repo_root)
+  repo_name=$(git_cm_get_repo_name)
+  absolut_path_git_hooks_dir="${repo_root}/${MAMBA_GITHOOK_PROJECT_SAMPLE_GITHOOKS_DIR}"
+  if [ -d "${absolut_path_git_hooks_dir}" ]; then
+    sh_cm_remove_dir "${absolut_path_git_hooks_dir}" || { return 1; }
+  fi
+  return 0
+}
+
+run_init_project() {
+  ###################################################
+  # Initializes the mamba-githook for the project.
+  #
+  # Creates the .githooks.d directory and copies
+  # the template files to the .githooks.d directory.
+  # Links the hookPath into shared hooks.
+  #
+  # Args:
+  #   $1: --create-sample, default: not create sample
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ###################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_init_project
+    return 0
+    ;;
+  --create-sample)
+    __create_project_sample || {
+      if sh_cm_is_dir_exist "${absolut_path_git_hooks_dir}" >/dev/null; then
+        sh_cm_remove_dir "${absolut_path_git_hooks_dir}"
+      fi
+      return 1
+    }
+    ;;
+  *) ;; # do nothing
+  esac
+  git_cm_config_set_core_hookspath "--local" "${MAMBA_GITHOOK_HOOKS_DIR}"
+}
+
+run_deinit_project() {
+  ####################################################
+  # Deinitializes the mamba-githook for the project.
+  #
+  # Args:
+  #   $1: options
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ####################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_deinit_project
+    return 0
+    ;;
+  --delete-sample)
+    __delete_project_sample
+    ;;
+  *) ;; # do nothing
+  esac
+  git_cm_config_unset_core_hookspath "--local" 2>/dev/null || {
+    log_debug "The git core.hooksPath is not set locally"
+  }
+}
+
+run_set_global_core_hookspath() {
+  ################################################
+  # Set the git global core.hooksPath.
+  #
+  # Args:
+  #   $1: options
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_init_global_hookspath
+    return 0
+    ;;
+  *)
+    git_cm_config_set_core_hookspath "--global" "${MAMBA_GITHOOK_HOOKS_DIR}"
+    ;;
+  esac
+}
+
+run_unset_global_core_hookspath() {
+  ################################################
+  # Unset the git global core.hooksPath.
+  #
+  # Args:
+  #   $1: options
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  options="$1"
+  case "${options}" in
+  -h | --help)
+    usage_deinit_global_hookspath
+    return 0
+    ;;
+  *)
+    git_cm_config_unset_core_hookspath "--global" 2>/dev/null || {
+      log_debug "The git core.hooksPath is not set globally"
+    }
+    ;;
+  esac
+}
+
+usage() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} [OPTIONS] [COMMAND] [COMMAND-OPTIONS]
+
+  A utility designed to managing Git hooks within a self-contained Micromamba environment.
+  This versatile tool enables both project-specific and global configuration of Git hooks,
+  ensuring seamless integration and streamlined workflows.
+
+Options:
+  -h, --help                Show this help message and exit.
+  -v, --version             Print the version of mamba-githook and exit.
+  -V, --verbose             Enable verbose mode. (Enables debug logs for mamba-githook)
+  -VV, --very-verbose       Enable very verbose mode. (Enables debug logs for mamba-githook and micromamba)
+
+Commands:
+  init-project
+  deinit-project
+  init-global-hookspath
+  deinit-global-hookspath
+  install-micromamba
+  init-shell
+  adhoc-shell
+  uninstall-micromamba
+  run-hooks
+  micromamba-run
+  micromamba-create-env
+  mcmamba-cmd
+
+Examples:
+  ${MAMBA_GITHOOK} --version
+  ${MAMBA_GITHOOK} init-project -h
+  ${MAMBA_GITHOOK} mcmamba-cmd create -h
+
+Use '${MAMBA_GITHOOK} [COMMAND] --help' for more information about a command.
+
+EOF
+}
+
+usage_init_project() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} init-project [OPTIONS]
+
+  Initialize mamba-githook for current git project.
+  It will set the git core.hooksPath for the local project.
+  If '--create-sample' is provided, it will create a sample project.
+
+Options:
+  -h, --help                Show this help message and exit.
+  --create-sample           Create a sample project.
+
+Examples:
+  ${MAMBA_GITHOOK} init-project
+  ${MAMBA_GITHOOK} init-project --create-sample
+
+EOF
+}
+
+usage_deinit_project() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} deinit-project [OPTIONS]
+
+  Deinitialize mamba-githook for current git project.
+  It will unset the git core.hooksPath for the local project.
+  If '--delete-sample' is provided, it will delete the sample project.
+
+Options:
+  -h, --help                Show this help message and exit.
+  --delete-sample           Delete the sample project.
+
+Examples:
+  ${MAMBA_GITHOOK} deinit-project
+  ${MAMBA_GITHOOK} deinit-project --delete-sample
+
+EOF
+}
+
+usage_init_global_hookspath() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} init-global-hookspath [OPTIONS]
+
+  Initialize mamba-githook globally.
+  It will set the git core.hooksPath globally.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  ${MAMBA_GITHOOK} init-global-hookspath
+
+EOF
+}
+
+usage_deinit_global_hookspath() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} deinit-global-hookspath [OPTIONS]
+
+  Deinitialize mamba-githook globally.
+  It will unset the git core.hooksPath globally.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  ${MAMBA_GITHOOK} deinit-global-hookspath
+
+EOF
+}
+
+usage_install_micromamba() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} install-micromamba [OPTIONS]
+
+  Install micromamba.
+
+Options:
+  -h, --help                Show this help message and exit.
+  -y, --yes                 Install micromamba without confirmation.
+
+Examples:
+  ${MAMBA_GITHOOK} install-micromamba --yes
+
+EOF
+}
+
+usage_init_shell() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} init-shell [OPTIONS]
+
+  Install micromamba and initialize the shell.
+
+  Note:
+    After this command shell profile file needs to be sourced or shell needs to be restarted.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  ${MAMBA_GITHOOK} init-shell
+
+EOF
+}
+
+usage_adhoc_shell() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} adhoc-shell [OPTIONS]
+
+  Install micromamba and set the micromamba command in the current shell.
+
+  Note:
+    This is neccaesary to run the micromamba activate command in the current shell.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  ${MAMBA_GITHOOK} adhoc-shell
+
+EOF
+}
+
+usage_uninstall_micromamba() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} uninstall-micromamba [OPTIONS]
+
+Options:
+  -h, --help                Show this help message and exit.
+  -y, --yes                 Uninstall micromamba without confirmation.
+
+Examples:
+  ${MAMBA_GITHOOK} uninstall-micromamba --yes
+
+EOF
+}
+
+usage_run_hooks() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} run-hooks [OPTIONS] [HOOK-TYPE] [HOOK-DIR]
+
+  Run the git hooks in the .githooks.d directory.
+
+Positional Arguments:
+  HOOK-TYPE                 The type of the hook. The hook type is the first part of the hook name.
+                            The hook name should be in the format of pre-commit.priority.hook_name.
+                            Priority is optional. Priority is used to determine the order of the hooks.
+                            Lower values have higher priority.
+  HOOK-DIR                  The directory of the hooks. Default: .githooks.d
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  Run the pre-commit hooks in the .githooks.d directory:
+    ${MAMBA_GITHOOK} run-hooks pre-commit .githooks.d
+
+EOF
+}
+
+usage_micromamba_run_cmd() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} micromamba-run [OPTIONS] [MICROMAMBA-RUN-ARGS]
+
+  Run an executable in micromamba environment.
+  See micromamba documentation for more information.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  Run the pre-commit hook in the micromamba environment:
+    ${MAMBA_GITHOOK} micromamba-run -n mamba-env-name pre-commit --version
+
+EOF
+}
+
+usage_run_micromamba_create_env() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} micromamba-create-env [OPTIONS] [MICROMAMBA-CREATE-ARGS]
+
+  Create a micromamba environment.
+
+Options:
+  -h, --help                Show help message for micrmamba create command.
+
+Examples:
+  Create a micromamba environment from environment.yaml file:
+    ${MAMBA_GITHOOK} micromamba-create-env --file environment.yaml
+
+EOF
+}
+
+usage_run_micromamba_cmd() {
+  cat <<EOF
+Usage:
+  ${MAMBA_GITHOOK} mcmamba-cmd [OPTIONS] [MICROMAMBA-COMMAND] [MICROMAMBA-COMMAND-ARGS]
+
+  Run commands for micromamba.
+  See micromamba documentation for more information.
+
+Options:
+  -h, --help                Show this help message and exit.
+
+Examples:
+  Run the micromamba command:
+    ${MAMBA_GITHOOK} mcmamba-cmd --help
+
+EOF
+}
+
+main() {
+  ################################################
+  # Main function.
+  #
+  # Args:
+  #   $@: options and command arguments
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  if [ $# -eq 0 ]; then
+    usage
+    return 0
+  fi
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      usage
+      return 0
+      ;;
+    -v | --version)
+      get_version
+      return 0
+      ;;
+    -V | --verbose)
+      export MAMBA_GITHOOK_VERBOSE="true"
+      shift
+      ;;
+    -VV | --very-verbose)
+      export MAMBA_GITHOOK_VERY_VERBOSE="true"
+      shift
+      ;;
+    init-project | deinit-project | init-global-hookspath | deinit-global-hookspath | \
+      install-micromamba | adhoc-shell | init-shell | uninstall-micromamba | run-hooks | \
+      micromamba-run | micromamba-create-env | mcmamba-cmd)
+      handle_commands "$@"
+      return $?
+      ;;
+    internal-command)
+      shift
+      handle_internal_commands "$@"
+      return $?
+      ;;
+    *)
+      usage
+      return 1
+      ;;
+    esac
+  done
+}
+
+handle_internal_commands() {
+  ################################################
+  # Handles the internal commands.
+  #
+  # Args:
+  #   $@: options and command arguments
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  command="$1"
+  shift # remove the command from the arguments
+
+  case "${command}" in
+  __set-project-githooks-dir)
+    __set_project_githooks_dir "$@"
+    return $?
+    ;;
+  __export-yaml-file-name)
+    __export_dynamic_hook_env_yaml_file_name "$@"
+    return $?
+    ;;
+  __get-env-name)
+    __get_env_name_from_yaml "$@"
+    return $?
+    ;;
+  *)
+    usage
+    return 1
+    ;;
+  esac
+}
+
+handle_commands() {
+  ################################################
+  # Handles the command.
+  #
+  # Args:
+  #   $@: options and command arguments
+  #
+  # Returns:
+  #   0 if the command is successful, 1 otherwise.
+  ################################################
+  command="$1"
+  shift # remove the command from the arguments
+
+  case "${command}" in
+  init-project)
+    run_init_project "$@"
+    return $?
+    ;;
+  deinit-project)
+    run_deinit_project "$@"
+    return $?
+    ;;
+  init-global-hookspath)
+    run_set_global_core_hookspath "$@"
+    return $?
+    ;;
+  deinit-global-hookspath)
+    run_unset_global_core_hookspath
+    return $?
+    ;;
+  install-micromamba)
+    run_install_micromamba "$@"
+    return $?
+    ;;
+  init-shell)
+    case "$1" in
+    -h | --help)
+      usage_init_shell
+      return 0
+      ;;
+    *)
+      mcmamba_utils_micromamba_shell_init
+      return $?
+      ;;
+    esac
+    ;;
+  adhoc-shell)
+    case "$1" in
+    -h | --help)
+      usage_adhoc_shell
+      return 0
+      ;;
+    *)
+      mcmamba_utils_micromamba_shell_hook_cmd
+      ;;
+    esac
+    ;;
+  uninstall-micromamba)
+    run_uninstall_micromamba "$@"
+    return $?
+    ;;
+  run-hooks)
+    case "$1" in
+    -h | --help)
+      usage_run_hooks
+      return 0
+      ;;
+    *)
+      hooks_runner "$@"
+      return $?
+      ;;
+    esac
+    ;;
+  micromamba-run)
+    case "$1" in
+    -h | --help)
+      usage_micromamba_run_cmd
+      return 0
+      ;;
+    *)
+      mcmamba_utils_micromamba_run_cmd "$@"
+      return $?
+      ;;
+    esac
+    ;;
+  micromamba-create-env)
+    case "$1" in
+    -h | --help)
+      usage_run_micromamba_create_env
+      return 0
+      ;;
+    *)
+      mcmamba_utils_micromamba_create "$@"
+      return $?
+      ;;
+    esac
+    ;;
+  mcmamba-cmd)
+    case "$1" in
+    -h | --help)
+      usage_run_micromamba_cmd
+      return 0
+      ;;
+    *)
+      mcmamba_utils_run_micromamba_cmd "$@"
+      return $?
+      ;;
+    esac
+    ;;
+  *)
+    usage
+    return 1
+    ;;
+  esac
+}
+
+main "${@}"

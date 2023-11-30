@@ -1,0 +1,24 @@
+#!/bin/sh
+######################################################################
+# Title: pre-push hook
+# Description: Runs the pre-push hook.
+# This pre-push hook configured based on 'mamba-githook' package.
+#
+# Author: Aydin Abdi
+######################################################################
+set -e
+
+main() {
+    #####################################
+    # Main function to run all functions.
+    #####################################
+    hook_type=$(basename "${0}")
+
+    # Set the project githooks directory
+    $(mamba-githook internal-command __set-project-githooks-dir)
+
+    # run the pre-push hook
+    mamba-githook run-hooks "${hook_type}" "${MAMBA_GITHOOK_PROJECT_GITHOOKS_DIR}"
+}
+
+main

@@ -1,0 +1,7 @@
+mamba-githook (1.0.0) unstable; urgency=medium
+
+  * Release version 1.0.0
+  * * 8b4c48e - First draft of mamba-githook debian package project
+  * * c3e2b49 - Initial commit
+
+ -- Aydin Abdi <ayd.abd@gmail.com>  Tue, 14 Nov 2023 02:30:45 +0100

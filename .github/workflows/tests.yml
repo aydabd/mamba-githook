@@ -1,0 +1,61 @@
+name: Docker CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update && apt-get install -y \
+        --no-install-recommends \
+        aptitude \
+        && apt-get clean && rm -rf /var/lib/apt/lists/* \
+        && aptitude update && aptitude install -y bats \
+        && aptitude clean && rm -rf /var/lib/apt/lists/* \
+        && aptitude autoclean
+
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Run unit tests
+      run: |
+        bats --version
+        bats -T tests/unit_tests/* --verbose-run
+
+  integration-tests-on-docker:
+    strategy:
+      matrix:
+        docker-platform: [ linux/amd64 ]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build docker image with locally
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: ${{ matrix.docker-platform }}
+        load: true
+        push: false
+        pull: false
+        tags: ${{ matrix.docker-platform }}:latest
+
+    - name: Run docker image with locally ${{ matrix.docker-platform }}
+      run: |
+        docker run --rm ${{ matrix.docker-platform }}:latest
