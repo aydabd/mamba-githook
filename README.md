@@ -14,9 +14,16 @@ Simplify your workflow and enforce code quality standards across projects.
 
 ## Installation
 
-1. Install the Debian package:
+1. Install the Debian package or install ubuntu package
 ```bash
+# Download artifact from github release version
 sudo dpkg -i mamba-githook_<version>*.db
+```
+for ubuntu installation:
+```bash
+sudo add-apt-repository ppa:aydabd/mamba-githook
+sudo apt-get update
+sudo apt-get install mamba-githook
 ```
 
 Note: If Micromamba is already installed, it will be skipped.

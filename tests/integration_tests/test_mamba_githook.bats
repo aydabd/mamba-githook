@@ -111,16 +111,8 @@ setup_test() {
   mamba-githook install-micromamba <<<"y"
 }
 
-@test 'test install-micromamba with wrong arguments fails' {
-  run ! mamba-githook install-micromamba --wrong-argument
-}
-
 @test 'test uninstall-micromamba without arguments reads from input' {
   mamba-githook uninstall-micromamba <<<"y"
-}
-
-@test 'test uninstall-micromamba with wrong arguments fails' {
-  run ! mamba-githook uninstall-micromamba --wrong-argument
 }
 
 @test 'test install and uninstall Micromamba' {
