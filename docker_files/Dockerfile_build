@@ -1,0 +1,53 @@
+######################################################################################################################################
+# Title: Dockerfile for running integration tests for the mamba-githook package
+# Description: This Dockerfile sets up a Debian-based environment for building mamba-githook
+#              and running integration tests for the mamba-githook package.
+#
+# Author: Aydin Abdi
+#
+# Examples of how to build and upload the mamba-githook package:
+#   Remember to modify debian/changeloge to reflect the distribution for Ubuntu
+#   Then:
+#   # Build the builder image
+#   docker build -t mamba-githook-builder -f Dockerfile_build docker_files
+#   # Ensure that the ~/.gnupg directory is mounted to the container
+#   docker run -it -v ~/.gnupg:/root/.gnupg build-mamba-githook
+#   # Build the package
+#   debuild -S -sa
+#   # Upload the package to the Debian repository
+#   dput mamba-githook ../mamba-githook_1.0.0_source.changes
+######################################################################################################################################
+
+# Base Image for Building the mamba-githook Package
+FROM debian:bookworm as builder
+
+LABEL maintainer="Aydin Abdi" \
+    description="Builder image for mamba-githook package" \
+    version="1.0.0"
+
+# Set up the environment
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/Stockholm
+
+# Set up the working directory
+WORKDIR /app
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    build-essential \
+    devscripts \
+    debhelper \
+    gnupg \
+    dput \
+    ftp \
+    # Clean up in the same layer to keep the image size down
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/*
+
+# Copy the mamba-githook source code to the image
+COPY debian /app/debian
+COPY src /app/src
+COPY LICENSE /app/LICENSE
+COPY .dput.cf /root/.dput.cf

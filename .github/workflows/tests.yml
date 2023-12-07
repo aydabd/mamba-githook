@@ -52,6 +52,7 @@ jobs:
         load: true
         push: false
         pull: false
+        file: docker_files/Dockerfile
         tags: ${{ matrix.docker-platform }}:latest
 
     - name: Run docker image with locally ${{ matrix.docker-platform }}

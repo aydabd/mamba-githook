@@ -1,0 +1,6 @@
+[mamba-githook]
+fqdn = ppa.launchpad.net
+method = ftp
+incoming = ~aydabd/ubuntu/mamba-githook/
+login = anonymous
+allow_unsigned_uploads = 0
