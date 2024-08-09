@@ -42,7 +42,7 @@ jobs:
         run: mkdir -p ${{ env.DEBIAN_CACHE_PATH }}
 
       - name: Cache for debian packages
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ env.DEBIAN_CACHE_PATH }}
           key: |
