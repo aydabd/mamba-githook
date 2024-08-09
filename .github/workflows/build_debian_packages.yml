@@ -38,7 +38,7 @@ jobs:
         cp ../mamba-githook_*.deb mamba-githook_${{matrix.platform}}.deb
 
     - name: Upload debian package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name:  mamba-githook_${{matrix.platform}}.deb
         path: mamba-githook_${{matrix.platform}}.deb
