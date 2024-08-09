@@ -2,6 +2,5 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    prefix: "gh-actions"
     schedule:
       interval: "weekly"
