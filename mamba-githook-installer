@@ -117,7 +117,7 @@ download_files() {
     download_file "src/utils/variables.sh" "$TARGET_DIR/utils/variables.sh" "false"
     download_file "src/utils/logger.sh" "$TARGET_DIR/utils/logger.sh" "false"
     download_file "src/utils/git_common.sh" "$TARGET_DIR/utils/git_common.sh" "false"
-    download_file "src/utils/_version.sh" "$TARGET_DIR/utils/_version.sh" "false"
+    download_file "src/utils/__version.sh" "$TARGET_DIR/utils/__version.sh" "false"
     download_file "src/utils/micromamba_utils.sh" "$TARGET_DIR/utils/micromamba_utils.sh" "false"
     download_file "src/utils/run_hooks.sh" "$TARGET_DIR/utils/run_hooks.sh" "false"
     download_file "src/utils/shell_common.sh" "$TARGET_DIR/utils/shell_common.sh" "false"
