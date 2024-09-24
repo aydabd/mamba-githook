@@ -7,11 +7,12 @@ print_usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
 
-Install mamba-githook on your system.
+Install or uninstall mamba-githook on your system.
 
 Options:
   -h, --help     Show this help message and exit
   -v, --version  Show version information and exit
+  -u, --uninstall Uninstall mamba-githook
 
 This script will install mamba-githook in your home directory and update
 your shell configuration to include it in your PATH.
@@ -29,6 +30,15 @@ Supported shells:
 
 After installation, restart your terminal or source your shell configuration
 file to use mamba-githook.
+
+Example:
+  $ $0
+  $ source ~/.bashrc
+  $ mamba-githook --version
+  mamba-githook version 1.0.0
+
+  $ $0 --uninstall
+
 EOF
 }
 
@@ -57,6 +67,10 @@ setup_environment() {
             exit 1
             ;;
     esac
+
+    MAMBA_GITHOOK_BASE_PATH="$TARGET_DIR"
+    MAMBA_GITHOOK_BACKUP_DIR="$HOME/.mamba-githook-backup"
+    GIT_CONFIG_CORE_HOOKSPATH_BACKUP="$MAMBA_GITHOOK_BACKUP_DIR/core.hookpath.config"
 }
 
 # Create necessary directories
@@ -65,6 +79,7 @@ create_directories() {
     mkdir -p "$TARGET_DIR/utils"
     mkdir -p "$TARGET_DIR/templates"
     mkdir -p "$BIN_DIR"
+    mkdir -p "$MAMBA_GITHOOK_BACKUP_DIR"
 }
 
 # Download and copy files to the target directory
@@ -118,6 +133,11 @@ add_line_to_file() {
     grep -qxF "$1" "$2" || printf "%s\n" "$1" >> "$2"
 }
 
+# Remove a line from a file
+remove_line_from_file() {
+    sed -i.bak "/^$1$/d" "$2" && rm "$2.bak"
+}
+
 # Set PATH and environment variable for POSIX-compliant shells
 set_posix_shell_env() {
     add_line_to_file "export PATH=\"\$PATH:$BIN_DIR\"" "$1"
@@ -169,12 +189,98 @@ update_shell_config() {
     set_posix_shell_env "$HOME/.profile"
 }
 
+# Remove mamba-githook from shell configuration
+remove_shell_config() {
+    SHELL_NAME=$(basename "$SHELL")
+    case "$SHELL_NAME" in
+        bash)
+            remove_line_from_file "export PATH=\"\$PATH:$BIN_DIR\"" "$HOME/.bashrc"
+            remove_line_from_file "export MAMBA_GITHOOK_DIR=\"$TARGET_DIR\"" "$HOME/.bashrc"
+            ;;
+        zsh)
+            remove_line_from_file "export PATH=\"\$PATH:$BIN_DIR\"" "$HOME/.zshrc"
+            remove_line_from_file "export MAMBA_GITHOOK_DIR=\"$TARGET_DIR\"" "$HOME/.zshrc"
+            ;;
+        fish)
+            remove_line_from_file "set -x PATH \$PATH $BIN_DIR" "$HOME/.config/fish/config.fish"
+            remove_line_from_file "set -x MAMBA_GITHOOK_DIR $TARGET_DIR" "$HOME/.config/fish/config.fish"
+            ;;
+        csh|tcsh)
+            remove_line_from_file "setenv PATH \${PATH}:$BIN_DIR" "$HOME/.cshrc"
+            remove_line_from_file "setenv MAMBA_GITHOOK_DIR $TARGET_DIR" "$HOME/.cshrc"
+            ;;
+        *)
+            printf "Unsupported shell: %s\n" "$SHELL_NAME"
+            printf "Please manually remove mamba-githook-related lines from your shell configuration.\n"
+            ;;
+    esac
+
+    # Update .profile for login shells
+    remove_line_from_file "export PATH=\"\$PATH:$BIN_DIR\"" "$HOME/.profile"
+    remove_line_from_file "export MAMBA_GITHOOK_DIR=\"$TARGET_DIR\"" "$HOME/.profile"
+}
+
+# Functionality from postinst script
+postinst() {
+    . "$TARGET_DIR/utils/variables.sh"
+    . "$TARGET_DIR/utils/logger.sh"
+    . "$TARGET_DIR/utils/git_common.sh"
+
+    git_hookspath=$(git_cm_config_get_core_hookspath global 2>/dev/null) || {
+        log_info "No global git hookspath configuration found"
+        return 0
+    }
+
+    if [ ! -d "$MAMBA_GITHOOK_BACKUP_DIR" ]; then
+        mkdir -p "$MAMBA_GITHOOK_BACKUP_DIR" || {
+            log_error "Failed to create the backup directory: $MAMBA_GITHOOK_BACKUP_DIR"
+            return 1
+        }
+        log_info "Successfully created the backup directory: $MAMBA_GITHOOK_BACKUP_DIR"
+    fi
+
+    printf "%s" "$git_hookspath" > "$GIT_CONFIG_CORE_HOOKSPATH_BACKUP" || {
+        log_error "Failed to backup git hookspath configuration: $git_hookspath"
+        return 1
+    }
+    log_info "Successfully backed up git hookspath configuration: $git_hookspath into $GIT_CONFIG_CORE_HOOKSPATH_BACKUP"
+
+    git config --global core.hooksPath "$TARGET_DIR/hooks"
+    log_info "Set global Git core.hooksPath to $TARGET_DIR/hooks"
+}
+
+# Functionality from prerm script
+prerm() {
+    . "$TARGET_DIR/utils/variables.sh"
+    . "$TARGET_DIR/utils/logger.sh"
+    . "$TARGET_DIR/utils/git_common.sh"
+
+    mamba_githook_path=$(git_cm_config_get_core_hookspath global 2>/dev/null) || {
+        log_info "No global git hookspath configuration found"
+        return 0
+    }
+
+    if [ -f "$GIT_CONFIG_CORE_HOOKSPATH_BACKUP" ]; then
+        backed_up_mamba_githook_path_content=$(cat "$GIT_CONFIG_CORE_HOOKSPATH_BACKUP")
+        log_info "Set back the global git hookspath configuration to $backed_up_mamba_githook_path_content"
+        git_cm_config_set_core_hookspath global "$backed_up_mamba_githook_path_content" || {
+            return 1
+        }
+    else
+        log_info "Unset the global git hookspath configuration"
+        git_cm_config_unset_core_hookspath global || {
+            return 1
+        }
+    fi
+}
+
 # Main installation function
 install_mamba_githook() {
     setup_environment
     create_directories
     download_files
     update_shell_config
+    postinst
 
     printf "mamba-githook setup completed successfully for %s (%s)\n" "$OS" "$ARCH"
     printf "Installation complete. You may need to restart your terminal or source your shell configuration file for changes to take effect.\n"
@@ -183,6 +289,25 @@ install_mamba_githook() {
     printf "export PATH=\"\$PATH:%s\"\n" "$BIN_DIR"
     printf "export MAMBA_GITHOOK_DIR=\"%s\"\n" "$TARGET_DIR"
 }
+
+# Main uninstallation function
+uninstall_mamba_githook() {
+    setup_environment
+    prerm
+    remove_shell_config
+
+    # Remove installed files
+    rm -f "$BIN_DIR/mamba-githook"
+    rm -r "$TARGET_DIR"
+    rm -r "$MAMBA_GITHOOK_BACKUP_DIR"
+
+    printf "mamba-githook has been uninstalled.\n"
+    printf "Please restart your terminal or source your shell configuration file for changes to take effect.\n"
+}
+
+# Set repository information
+REPO_OWNER="aydabd"
+REPO_NAME="mamba-githook"
 
 # Parse command-line arguments
 while [ "$#" -gt 0 ]; do
@@ -195,6 +320,10 @@ while [ "$#" -gt 0 ]; do
             print_version
             exit 0
             ;;
+        -u|--uninstall)
+            uninstall_mamba_githook
+            exit 0
+            ;;
         *)
             printf "Unknown option: %s\n" "$1"
             print_usage
@@ -204,9 +333,5 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 
-# Set repository information
-REPO_OWNER="aydabd"
-REPO_NAME="mamba-githook"
-
-# Run the installation
+# Run the installation if no uninstall option is provided
 install_mamba_githook

@@ -40,6 +40,12 @@ curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-gith
 curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s
 ```
 
+## Uninstall
+
+```bash
+curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- --uninstall
+```
+
 ## How to use
 
 1. Configure git hooks for a specific git repository and create sample:
