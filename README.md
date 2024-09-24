@@ -14,7 +14,8 @@ Simplify your workflow and enforce code quality standards across projects.
 
 ## Installation
 
-1. Install the Debian package or install ubuntu package
+### Install the Debian package or install ubuntu package
+
 ```bash
 # Download artifact from github release version
 sudo dpkg -i mamba-githook_<version>*.db
@@ -28,14 +29,27 @@ sudo apt-get install mamba-githook
 
 Note: If Micromamba is already installed, it will be skipped.
 
-2. Configure git hooks for a specific git repository and create sample:
+
+## Install for other platforms with installer script
+
+```sh
+# Check the installer version script
+curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- --version
+
+# Install the latest version
+curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s
+```
+
+## How to use
+
+1. Configure git hooks for a specific git repository and create sample:
 ```bash
 cd /path/to/git/repo && mamba-githook init-project --create-sample
 ```
 
 Note: If the git repository is already has a custom hook directory, it will be skipped.
 
-3. Now commit the files and push to the remote repository.
+2. Now commit the files and push to the remote repository.
 The git hook will run the script files in the custom hook directory.
 
 If any of the commands fail, the commit will be aborted.
