@@ -2,6 +2,10 @@
 
 set -e
 
+REPO_OWNER="aydabd"
+REPO_NAME="mamba-githook"
+VERSION="$(git describe --tags --always --abbrev=0 2>/dev/null || printf "1.0.0")"
+
 # Print usage information
 print_usage() {
     cat << EOF
@@ -35,7 +39,7 @@ Example:
   $ $0
   $ source ~/.bashrc
   $ mamba-githook --version
-  mamba-githook version 1.0.0
+  mamba-githook version $VERSION
 
   $ $0 --uninstall
 
@@ -44,8 +48,7 @@ EOF
 
 # Print version information
 print_version() {
-    version=$(git describe --tags --always --abbrev=0)
-    printf "mamba-githook installer %s\n" "$version"
+    printf "mamba-githook installer %s\n" "$VERSION"
 }
 
 # Detect OS and set target directories
