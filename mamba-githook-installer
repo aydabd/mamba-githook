@@ -61,19 +61,56 @@ setup_environment() {
 
 # Create necessary directories
 create_directories() {
-    mkdir -p "$TARGET_DIR"
+    mkdir -p "$TARGET_DIR/hooks"
+    mkdir -p "$TARGET_DIR/utils"
+    mkdir -p "$TARGET_DIR/templates"
     mkdir -p "$BIN_DIR"
 }
 
-# Copy files from source to target directories
-copy_files() {
-    printf "Copying files to %s...\n" "$TARGET_DIR"
-    cp -R src/hooks "$TARGET_DIR/"
-    cp -R src/utils "$TARGET_DIR/"
-    cp -R src/templates "$TARGET_DIR/"
-    cp src/mamba-githook "$BIN_DIR/"
+# Download and copy files to the target directory
+download_file() {
+    src_path="$1"
+    dst_path="$2"
+    is_executable="$3"
+    if ! curl -sSfL "$BASE_URL/$src_path" -o "$dst_path"; then
+        printf "Failed to download %s\n" "$src_path"
+        return 1
+    fi
 
-    chmod +x "$BIN_DIR/mamba-githook"
+    if [ "$is_executable" = "true" ]; then
+        chmod +x "$dst_path"
+    fi
+}
+
+# Download files from the repository
+download_files() {
+    BASE_URL="https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main"
+    
+    printf "Downloading mamba-githook files...\n"
+    
+    # Download main script
+    download_file "src/mamba-githook" "$BIN_DIR/mamba-githook" "true"
+    
+    # Download hooks
+    download_file "src/hooks/pre-commit" "$TARGET_DIR/hooks/pre-commit" "true"
+    download_file "src/hooks/pre-push" "$TARGET_DIR/hooks/pre-push" "true"
+    
+    # Download utils
+    download_file "src/utils/variables.sh" "$TARGET_DIR/utils/variables.sh" "false"
+    download_file "src/utils/logger.sh" "$TARGET_DIR/utils/logger.sh" "false"
+    download_file "src/utils/git_common.sh" "$TARGET_DIR/utils/git_common.sh" "false"
+    download_file "src/utils/_version.sh" "$TARGET_DIR/utils/_version.sh" "false"
+    download_file "src/utils/micromamba_utils.sh" "$TARGET_DIR/utils/micromamba_utils.sh" "false"
+    download_file "src/utils/run_hooks.sh" "$TARGET_DIR/utils/run_hooks.sh" "false"
+    download_file "src/utils/shell_common.sh" "$TARGET_DIR/utils/shell_common.sh" "false"
+    
+    # Download templates
+    download_file "src/templates/project_sample/.pre-commit-config.yaml" "$TARGET_DIR/templates/project_sample/.pre-commit-config.yaml" "false"
+    download_file "src/templates/project_sample/pre-commmit_environment.yaml" "$TARGET_DIR/templates/project_sample/pre-commmit_environment.yaml" "false"
+    download_file "src/templates/project_sample/pre-commit.10.pre_commit" "$TARGET_DIR/templates/project_sample/pre-commit.10.pre_commit" "true"
+    download_file "src/templates/project_sample/pre-push.10.jira" "$TARGET_DIR/templates/project_sample/pre-push.10.jira" "true"
+
+    printf "Downloaded files to %s and %s\n" "$BIN_DIR" "$TARGET_DIR"
 }
 
 # Add a line to a file if it doesn't exist
@@ -136,7 +173,7 @@ update_shell_config() {
 install_mamba_githook() {
     setup_environment
     create_directories
-    copy_files
+    download_files
     update_shell_config
 
     printf "mamba-githook setup completed successfully for %s (%s)\n" "$OS" "$ARCH"
@@ -166,6 +203,10 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+# Set repository information
+REPO_OWNER="aydabd"
+REPO_NAME="mamba-githook"
 
 # Run the installation
 install_mamba_githook
