@@ -67,11 +67,15 @@ jobs:
         mkdir -p ${{ github.workspace }}/_build
         docker run --rm -v ${{ github.workspace }}/_build:/_build mamba-githook-builder
 
-    - name: Upload multi-platform binaries
-      uses: actions/upload-artifact@v4
-      with:
-        name: mamba-githook-binaries
-        path: _build/*
+    - name: Upload multi-platform binaries as split artifacts
+      run: |
+        cd _build
+        for file in *; do
+          tar -czf "${file}.tar.gz" "${file}"
+          printf "Uploading %s\n" "${file}.tar.gz"
+          mv "${file}.tar.gz" "mamba-githook-binary-${file}"
+        done
+      shell: bash
 
   create-release:
     needs: [build-debian-packages, build-multi-platform]
@@ -79,14 +83,16 @@ jobs:
     steps:
     - name: Download all workflow run artifacts
       uses: actions/download-artifact@v4
+    - name: Prepare release assets
+      run: |
+        mkdir -p release_assets
+        mv mamba-githook_*.deb release_assets/
+        mv _build/mamba-githook-binary-* release_assets/
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          mamba-githook_amd64.deb/mamba-githook_amd64.deb
-          mamba-githook_arm64.deb/mamba-githook_arm64.deb
-          mamba-githook_armhf.deb/mamba-githook_armhf.deb
-          mamba-githook-binaries/*
+          release_assets/*
         draft: false
         prerelease: false
       env:
