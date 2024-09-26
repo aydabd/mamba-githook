@@ -54,7 +54,6 @@ __pycache__/
 **/etc/**
 **/var/**
 **/tmp/**
-**/log/**
 **/cache/**
 **/data/**
 **/output.txt
