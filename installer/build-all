@@ -13,6 +13,9 @@ windows/amd64
 windows/arm64
 "
 
+# Ensure all dependencies are installed
+go mod tidy
+
 if [ -n "$(gofmt -s -l .)" ]; then
   printf "Code is not formatted"
   exit 1
