@@ -55,7 +55,7 @@ jobs:
     - name: Build and run multi-platform builder
       uses: docker/build-push-action@v6
       with:
-        context: ..
+        context: .
         file: installer/Dockerfile
         push: false
         pull: false
