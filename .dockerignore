@@ -1,0 +1,19 @@
+# Ignore version control folders
+.git/
+.gitignore
+
+# Ignore editor and IDE folders
+.vscode/
+.idea/
+
+# Ignore local build outputs
+_build/
+dist/
+
+# Ignore system or OS-specific files
+**/.DS_Store
+**/Thumbs.db
+
+# Ignore Go module cache
+pkg/
+
