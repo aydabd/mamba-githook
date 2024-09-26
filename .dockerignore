@@ -16,4 +16,3 @@ dist/
 
 # Ignore Go module cache
 pkg/
-

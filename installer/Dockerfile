@@ -41,4 +41,3 @@ VOLUME /_build
 
 # Default command to execute the build-all script
 CMD ["./build-all"]
-

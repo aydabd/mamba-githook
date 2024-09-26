@@ -32,8 +32,7 @@ for TARGET in $TARGETS; do
     OUTPUT_NAME="${OUTPUT_NAME}.exe"
   fi
   printf "Building for $GOOS/$GOARCH"
-  
+
   CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH \
   go build -buildvcs=false -a -installsuffix cgo -o ${OUTPUT_DIR}/${OUTPUT_NAME} ${CMD_PATH}
 done
-

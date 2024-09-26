@@ -87,7 +87,7 @@ main() {
     if [ "$clean" = true ]; then
         clean_build
     fi
-    
+
     mk__build_dir
     build
 
