@@ -30,20 +30,20 @@ sudo apt-get install mamba-githook
 Note: If Micromamba is already installed, it will be skipped.
 
 
-## Install for other platforms with installer script
+## Install for other platforms with go installer
 
 ```sh
 # Check the installer version script
 curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- --version
 
 # Install the latest version
-curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s
+curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- install
 ```
 
 ## Uninstall
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- --uninstall
+curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- uninstall
 ```
 
 ## How to use
