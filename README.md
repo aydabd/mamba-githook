@@ -32,18 +32,31 @@ Note: If Micromamba is already installed, it will be skipped.
 
 ## Install for other platforms with go installer
 
-```sh
-# Check the installer version script
-curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- --version
-
-# Install the latest version
-curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- install
-```
-
-## Uninstall
+Check the latest release version and desired OS/ARCH from the [releases page](https://github.com/aydabd/mamba-githook/releases).
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/aydabd/mamba-githook/main/mamba-githook-installer | sh -s -- uninstall
+# Get the binary and run help command
+curl -L https://github.com/aydabd/mamba-githook/releases/download/1.0.1/mamba-githook-installer-darwin-arm64 -o mamba-githook-installer && chmod +x mamba-githook-installer && ./mamba-githook-installer --help
+
+
+# Install the latest version
+curl -L https://github.com/aydabd/mamba-githook/releases/download/1.0.1/mamba-githook-installer-darwin-arm64 -o mamba-githook-installer && chmod +x mamba-githook-installer && ./mamba-githook-installer install
+
+# Chech th status
+./mamba-githook-installer status
+```
+
+## Uninstall the Debian package
+
+```bash
+sudo apt-get remove mamba-githook
+```
+
+## Uninstall for other platforms with go installer
+
+```bash
+# Uninstall the latest version
+./mamba-githook-installer uninstall
 ```
 
 ## How to use
