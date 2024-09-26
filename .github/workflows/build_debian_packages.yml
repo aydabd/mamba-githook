@@ -1,4 +1,4 @@
-name: Build Debian Packages
+name: Build Debian Packages and Multi-Platform go installer binaries
 
 on:
   push:
@@ -42,3 +42,52 @@ jobs:
       with:
         name:  mamba-githook_${{matrix.platform}}.deb
         path: mamba-githook_${{matrix.platform}}.deb
+
+  build-multi-platform:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and run multi-platform builder
+      uses: docker/build-push-action@v6
+      with:
+        context: ..
+        file: installer/Dockerfile
+        push: false
+        pull: false
+        load: true
+        tags: mamba-githook-builder:latest
+
+    - name: Run container and build binaries
+      run: |
+        mkdir -p ${{ github.workspace }}/_build
+        docker run --rm -v ${{ github.workspace }}/_build:/_build mamba-githook-builder
+
+    - name: Upload multi-platform binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: mamba-githook-binaries
+        path: _build/*
+
+  create-release:
+    needs: [build-debian-packages, build-multi-platform]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all workflow run artifacts
+      uses: actions/download-artifact@v4
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          mamba-githook_amd64.deb/mamba-githook_amd64.deb
+          mamba-githook_arm64.deb/mamba-githook_arm64.deb
+          mamba-githook_armhf.deb/mamba-githook_armhf.deb
+          mamba-githook-binaries/*
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
