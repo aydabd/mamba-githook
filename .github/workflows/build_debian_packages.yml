@@ -63,22 +63,11 @@ jobs:
       run: |
         mkdir -p ${{ github.workspace }}/_build
         docker run --rm -v ${{ github.workspace }}/_build:/_build mamba-githook-builder
-    - name: Upload multi-platform binaries
-      run: |
-        cd ${{ github.workspace }}/_build
-        for file in *; do
-          echo "Uploading $file"
-          echo "::group::Upload $file"
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/zip" \
-            --data-binary "@${file}" \
-            "https://uploads.github.com/repos/${{ github.repository }}/actions/artifacts" \
-            -o response.json
-          cat response.json
-          rm response.json
-          echo "::endgroup::"
-        done
+    - name: upload binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: mamba-githook-installers
+        path: ${{ github.workspace }}/_build
 
   create-release:
     needs: [build-debian-packages, build-multi-platform]
@@ -94,7 +83,7 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir -p release_assets
-        find . -type f \( -name "*.deb" -o -name "*.zip" \) -exec cp {} release_assets/ \;
+        find . -type f \( -name "*.deb" -o -name "mamba-githook-*" \) -exec cp {} release_assets/ \;
     - name: Display release assets
       run: |
         echo "Release assets:"
