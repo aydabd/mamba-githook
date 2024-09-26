@@ -76,10 +76,6 @@ jobs:
     - name: Download all workflow run artifacts
       uses: actions/download-artifact@v4
       continue-on-error: true
-    - name: List downloaded artifacts
-      run: |
-        echo "Downloaded artifacts:"
-        find . -type f
     - name: Prepare release assets
       run: |
         mkdir -p release_assets
@@ -94,6 +90,7 @@ jobs:
         files: release_assets/*
         draft: false
         prerelease: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
     - name: Check release creation
