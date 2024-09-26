@@ -1,0 +1,101 @@
+#!/bin/sh
+
+set -e
+
+# Configuration
+SCRIPT_DIR=$(dirname "$0")
+_BUILD_DIR="${SCRIPT_DIR}/_build"
+COMPOSE_FILE="${SCRIPT_DIR}/compose.yaml"
+
+# Function to print usage information
+print_usage() {
+    cat <<EOF
+Usage: $0 [OPTIONS]
+
+Build mamba-githook installer for multiple architectures.
+
+Options:
+
+    -h, --help     Show this help message and exit
+    -c, --clean    Force a clean build
+    -d, --delete   Delete the build directory
+
+Examples:
+
+    # Build the installer
+    $0
+    # Clean before building
+    $0 --clean
+
+EOF
+}
+
+# Function to remove the build directory
+rm__build_dir() {
+    rm -rf "$_BUILD_DIR"
+}
+
+mk__build_dir() {
+    mkdir -p "$_BUILD_DIR"
+}
+
+# Function to perform a clean build
+clean_build() {
+    printf "Forcing a clean build...\n"
+    rm__build_dir
+    docker compose -f $COMPOSE_FILE down -v --rmi all
+    docker compose -f $COMPOSE_FILE rm -f
+}
+
+
+# Main build function
+build() {
+    docker compose -f $COMPOSE_FILE up --build --abort-on-container-exit
+}
+
+
+# Main function
+main() {
+    clean=false
+
+    # Parse command-line arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            -c|--clean)
+                clean=true
+                shift
+                ;;
+            -d|--delete)
+                rm__build_dir
+                exit 0
+                ;;
+            *)
+                printf "Unknown option: %s\n" "$1"
+                print_usage
+                exit 1
+                ;;
+        esac
+    done
+
+    # Change to the script's directory
+    # cd "$SCRIPT_DIR"
+
+    if [ "$clean" = true ]; then
+        clean_build
+    fi
+
+    mk__build_dir
+    build
+
+    printf "Stopping Docker containers...\n"
+    docker compose -f $COMPOSE_FILE down -v
+
+    printf "Build process completed successfully.\n"
+}
+
+# Run the main function
+main "$@"

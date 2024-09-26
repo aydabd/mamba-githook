@@ -109,5 +109,7 @@ RUN useradd -ms /bin/bash mamba-user \
 # Set the user to use when running this image
 USER mamba-user
 
+ENV MAMBA_GITHOOK_DIR="/usr/share/mamba-githook"
+
 # Set Default Command for running integration tests
 CMD ["/bin/bash", "-c", "fakeroot bats ${INTEGRATION_TEST_DIR}/* -T --verbose-run --print-output-on-failure"]

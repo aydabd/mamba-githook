@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+OUTPUT_DIR="/_build"
+CMD_PATH="./cmd"
+
+TARGETS="
+linux/amd64
+linux/arm64
+darwin/amd64
+darwin/arm64
+windows/amd64
+windows/arm64
+"
+
+if [ -n "$(gofmt -s -l .)" ]; then
+  printf "Code is not formatted"
+  exit 1
+fi
+
+if [ -n "$(go vet ./...)" ]; then
+  printf "Code is not vetted"
+  exit 1
+fi
+
+printf "Building binaries...\n"
+for TARGET in $TARGETS; do
+  GOOS=${TARGET%/*}
+  GOARCH=${TARGET#*/}
+  OUTPUT_NAME=mamba-githook-installer-${GOOS}-${GOARCH}
+  if [ "$GOOS" = "windows" ]; then
+    OUTPUT_NAME="${OUTPUT_NAME}.exe"
+  fi
+  printf "Building for $GOOS/$GOARCH"
+
+  CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH \
+  go build -buildvcs=false -a -installsuffix cgo -o ${OUTPUT_DIR}/${OUTPUT_NAME} ${CMD_PATH}
+done

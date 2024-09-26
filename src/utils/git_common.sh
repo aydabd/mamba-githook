@@ -13,7 +13,7 @@
 set -e
 
 # Use MAMBA_GITHOOK_BASE_PATH to override the base path of mamba-githook
-MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-"/usr/share/mamba-githook"}"
+MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-${MAMBA_GITHOOK_DIR}}"
 
 . "${MAMBA_GITHOOK_BASE_PATH}/utils/logger.sh"
 

@@ -15,7 +15,7 @@
 #       new_user
 ##############################################################################
 MAMBA_GITHOOK="mamba-githook"
-MAMBA_GITHOOK_DIR="/usr/share/${MAMBA_GITHOOK}"
+MAMBA_GITHOOK_DIR="${MAMBA_GITHOOK_DIR:-"/usr/share/${MAMBA_GITHOOK}"}"
 MAMBA_GITHOOK_HOOKS_DIR="${MAMBA_GITHOOK_DIR}/hooks"
 MAMBA_GITHOOK_BACKUP_DIR="${MAMBA_GITHOOK_DIR}/backup"
 GIT_CONFIG_CORE_HOOKSPATH_BACKUP="${MAMBA_GITHOOK_BACKUP_DIR}/core.hookpath.config"

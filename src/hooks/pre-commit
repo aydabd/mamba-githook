@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ######################################################################
 # Title: pre-commit hook for micromamba environment
 # Description: Run the pre-commit hook in the micromamba environment.
