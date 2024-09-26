@@ -11,7 +11,7 @@ set -e
 bats_minimum_version=$(bats_require_minimum_version "1.5.0" 2>/dev/null) || true
 
 # Use MAMBA_GITHOOK_BASE_PATH to override the base path of mamba-githook
-MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-"/usr/share/mamba-githook"}"
+MAMBA_GITHOOK_BASE_PATH="${MAMBA_GITHOOK_BASE_PATH:-${MAMBA_GITHOOK_DIR}}"
 
 SCRIPT_NAME="micromamba_utils"
 
