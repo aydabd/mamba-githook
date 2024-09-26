@@ -30,7 +30,7 @@ TestReport*.xml
 *.sublime-workspace
 
 # Other common ignores
-*.DS_Store
+**/.DS_Store
 Thumbs.db
 
 # python
@@ -42,6 +42,7 @@ __pycache__/
 **/site-packages/**
 **/dist/**
 **/build/**
+**/_build/**
 **/venv/**
 **/env/**
 **/lib64/**
