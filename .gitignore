@@ -57,3 +57,4 @@ __pycache__/
 **/log/**
 **/cache/**
 **/data/**
+**/output.txt
