@@ -63,21 +63,22 @@ jobs:
       run: |
         mkdir -p ${{ github.workspace }}/_build
         docker run --rm -v ${{ github.workspace }}/_build:/_build mamba-githook-builder
-    - name: Make upload script executable
-      run: chmod +x .github/scripts/upload_artifact.sh
-    - name: Upload multi-platform binaries individually
+    - name: Upload multi-platform binaries
       run: |
         cd ${{ github.workspace }}/_build
         for file in *; do
           echo "Uploading $file"
-          artifact_name="mamba-githook-binary-$(basename "$file")"
-          tar -czf "${file}.tar.gz" "$file"
-          echo "::group::Upload $artifact_name"
-          ${{ github.workspace }}/.github/scripts/upload_artifact.sh "${file}.tar.gz" "$artifact_name"
+          echo "::group::Upload $file"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@${file}" \
+            "https://uploads.github.com/repos/${{ github.repository }}/actions/artifacts" \
+            -o response.json
+          cat response.json
+          rm response.json
           echo "::endgroup::"
         done
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create-release:
     needs: [build-debian-packages, build-multi-platform]
@@ -86,12 +87,18 @@ jobs:
     - name: Download all workflow run artifacts
       uses: actions/download-artifact@v4
       continue-on-error: true
-
+    - name: List downloaded artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        find . -type f
     - name: Prepare release assets
       run: |
         mkdir -p release_assets
-        find . -type f \( -name "*.deb" -o -name "*.tar.gz" \) -exec cp {} release_assets/ \;
-
+        find . -type f \( -name "*.deb" -o -name "*.zip" \) -exec cp {} release_assets/ \;
+    - name: Display release assets
+      run: |
+        echo "Release assets:"
+        ls -l release_assets/
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -99,4 +106,12 @@ jobs:
         draft: false
         prerelease: false
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+    - name: Check release creation
+      run: |
+        if [ $? -eq 0 ]; then
+          echo "Release created successfully"
+        else
+          echo "Failed to create release"
+          exit 1
+        fi
