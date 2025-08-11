@@ -36,7 +36,7 @@ jobs:
       image: debian:latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Create debian cache directory
         run: mkdir -p ${{ env.DEBIAN_CACHE_PATH }}
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup micromamba and cache environment
       uses: mamba-org/setup-micromamba@v2
@@ -76,7 +76,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Debian Package Build Environment
       run: |
@@ -113,7 +113,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Make script executable
         run: chmod +x ${{ github.workspace }}/auto-fix-pre-commit
