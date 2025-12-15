@@ -99,7 +99,7 @@ jobs:
         cp ../mamba-githook_*.deb debian-package
 
     - name: Upload debian package
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: debian-package
         path: debian-package
