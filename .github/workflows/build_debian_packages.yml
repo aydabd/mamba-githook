@@ -38,7 +38,7 @@ jobs:
         cp ../mamba-githook_*.deb mamba-githook_${{matrix.platform}}.deb
 
     - name: Upload debian package
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name:  mamba-githook_${{matrix.platform}}.deb
         path: mamba-githook_${{matrix.platform}}.deb
@@ -64,7 +64,7 @@ jobs:
         mkdir -p ${{ github.workspace }}/_build
         docker run --rm -v ${{ github.workspace }}/_build:/_build mamba-githook-builder
     - name: upload binaries
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: mamba-githook-installers
         path: ${{ github.workspace }}/_build
