@@ -86,13 +86,13 @@ jobs:
         ls -l release_assets/
     - name: Create Release
       uses: softprops/action-gh-release@v3
+      permissions:
+        contents: write
       with:
         files: release_assets/*
         draft: false
         prerelease: false
         generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
     - name: Check release creation
       run: |
         if [ $? -eq 0 ]; then
