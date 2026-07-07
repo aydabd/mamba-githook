@@ -70,6 +70,8 @@ jobs:
         path: ${{ github.workspace }}/_build
 
   create-release:
+    permissions:
+      contents: write
     needs: [build-debian-packages, build-multi-platform]
     runs-on: ubuntu-latest
     steps:
@@ -86,8 +88,6 @@ jobs:
         ls -l release_assets/
     - name: Create Release
       uses: softprops/action-gh-release@v3
-      permissions:
-        contents: write
       with:
         files: release_assets/*
         draft: false
